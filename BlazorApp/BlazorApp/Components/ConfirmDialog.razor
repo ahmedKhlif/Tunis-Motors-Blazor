@@ -1,0 +1,133 @@
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header @GetHeaderClass() text-white border-0">
+                    <h5 class="modal-title">
+                        <i class="@GetIconClass() me-2"></i>
+                        @Title
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="Cancel"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="mb-0">@Message</p>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="Cancel">
+                        <i class="fa fa-times me-1"></i> @CancelText
+                    </button>
+                    <button type="button" class="btn @GetButtonClass()" @onclick="Confirm">
+                        <i class="@GetConfirmIconClass() me-1"></i> @ConfirmText
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm";
+    [Parameter] public string Message { get; set; } = "Are you sure?";
+    [Parameter] public string ConfirmText { get; set; } = "Confirm";
+    [Parameter] public string CancelText { get; set; } = "Cancel";
+    [Parameter] public DialogType Type { get; set; } = DialogType.Warning;
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    public enum DialogType
+    {
+        Success,
+        Warning,
+        Danger,
+        Info
+    }
+
+    private async Task Confirm()
+    {
+        IsVisible = false;
+        await OnConfirm.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        IsVisible = false;
+        await OnCancel.InvokeAsync();
+    }
+
+    private string GetHeaderClass()
+    {
+        return Type switch
+        {
+            DialogType.Success => "bg-success",
+            DialogType.Warning => "bg-warning",
+            DialogType.Danger => "bg-danger",
+            DialogType.Info => "bg-info",
+            _ => "bg-primary"
+        };
+    }
+
+    private string GetButtonClass()
+    {
+        return Type switch
+        {
+            DialogType.Success => "btn-success",
+            DialogType.Warning => "btn-warning",
+            DialogType.Danger => "btn-danger",
+            DialogType.Info => "btn-info",
+            _ => "btn-primary"
+        };
+    }
+
+    private string GetIconClass()
+    {
+        return Type switch
+        {
+            DialogType.Success => "fa fa-check-circle",
+            DialogType.Warning => "fa fa-exclamation-triangle",
+            DialogType.Danger => "fa fa-times-circle",
+            DialogType.Info => "fa fa-info-circle",
+            _ => "fa fa-question-circle"
+        };
+    }
+
+    private string GetConfirmIconClass()
+    {
+        return Type switch
+        {
+            DialogType.Danger => "fa fa-trash",
+            _ => "fa fa-check"
+        };
+    }
+}
+
+<style>
+    .modal.show {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .modal-content {
+        animation: slideDown 0.3s ease-in-out;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @@keyframes slideDown {
+        from {
+            transform: translateY(-50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+</style>

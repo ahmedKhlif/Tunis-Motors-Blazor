@@ -1,0 +1,490 @@
+﻿@namespace BlazorApp.Layout
+@using Microsoft.AspNetCore.Components.Authorization
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using System.Security.Claims
+@using Microsoft.JSInterop
+@implements IDisposable
+@inherits LayoutComponentBase
+@inject ICategoryService CategoryService
+@inject IMessageService MessageService
+@inject ICartService CartService
+@inject ICompareService CompareService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JSRuntime
+    <!-- TOP HEADER -->
+    <div id="top-header" class="bg-light border-bottom">
+        <div class="container">
+            <div class="row align-items-center py-2">
+                <div class="col-md-8">
+                    <ul class="header-links list-unstyled d-flex flex-wrap mb-0">
+                        <li class="me-4"><a href="tel:+216955184"><i class="fa fa-phone me-1"></i> +216 95 518 4</a></li>
+                        <li class="me-4"><a href="mailto:contact@carecommerce.tn"><i class="fa fa-envelope me-1"></i> contact@carecommerce.tn</a></li>
+                        <li><a href="#"><i class="fa fa-map-marker-alt me-1"></i> Tunis, Tunisia</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <ul class="header-links list-unstyled d-flex justify-content-end mb-0">
+                        <li class="me-3"><a href="#"><i class="fa fa-tunisian-dinar me-1"></i> TND</a></li>
+                        <AuthorizeView Context="auth">
+                            <Authorized>
+                                <li><a href="/profile"><i class="fa fa-user me-1"></i> My Account</a></li>
+                            </Authorized>
+                            <NotAuthorized>
+                                <li><a href="/login"><i class="fa fa-user me-1"></i> Login</a></li>
+                            </NotAuthorized>
+                        </AuthorizeView>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN HEADER -->
+    <header id="header" class="py-3">
+        <div class="container">
+            <div class="row align-items-center">
+                <!-- Logo -->
+                <div class="col-md-3 col-6">
+                    <a href="/" class="logo">
+                        <img src="images/logo.png" alt="Tunisia Motors" class="img-fluid" style="height: 60px;">
+                    </a>
+                </div>
+
+                <!-- Search -->
+                <div class="col-md-6 col-12 mt-3 mt-md-0">
+                    <form method="get" action="/shop" class="d-flex">
+                        <select class="form-select me-2" name="categoryId" style="min-width: 150px;">
+                            <option value="">All Categories</option>
+                            @if (categories != null && categories.Any())
+                            {
+                                foreach (var category in categories)
+                                {
+                                    <option value="@category.CategoryId">@category.CategoryName</option>
+                                }
+                            }
+                        </select>
+                        <input class="form-control me-2" name="searchTerm" placeholder="Search cars..." />
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Header Actions -->
+                <div class="col-md-3 col-6 text-end">
+                    <div class="d-flex justify-content-end align-items-center gap-3">
+                        <AuthorizeView Context="auth">
+                            <Authorized>
+                                <a href="/messages" class="position-relative text-decoration-none" title="Messages">
+                                    <i class="fa fa-envelope fa-lg"></i>
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="unread-count" style="font-size: 0.7em; display: none;">0</span>
+                                </a>
+                            </Authorized>
+                        </AuthorizeView>
+                        <a href="/cart" class="position-relative text-decoration-none" title="Shopping Cart">
+                            <i class="fa fa-shopping-cart fa-lg"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary" id="cart-count" style="font-size: 0.7em;">0</span>
+                        </a>
+                        <a href="/compare" class="position-relative text-decoration-none" title="Compare Cars">
+                            <i class="fa fa-exchange fa-lg"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-info" id="compare-count" style="font-size: 0.7em;">0</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- NAVIGATION -->
+    <nav id="navigation" class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <!-- Left Menu -->
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link @(Navigation.Uri == "/" ? "active" : "")" href="/">
+                            <i class="fa fa-home me-1"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @(Navigation.Uri.Contains("/about") ? "active" : "")" href="/about">
+                            <i class="fa fa-info-circle me-1"></i> About
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @(Navigation.Uri.Contains("/contact") ? "active" : "")" href="/contact">
+                            <i class="fa fa-envelope me-1"></i> Contact
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @(Navigation.Uri.Contains("/shop") && !Navigation.Uri.Contains("/create-listing") ? "active" : "")" href="/shop">
+                            <i class="fa fa-car me-1"></i> Browse Cars
+                        </a>
+                    </li>
+                    <AuthorizeView Roles="Seller,Admin,Manager" Context="auth">
+                        <Authorized>
+                            <li class="nav-item">
+                                <a class="nav-link @(Navigation.Uri.Contains("/create-listing") ? "active" : "")" href="/create-listing">
+                                    <i class="fa fa-plus-circle me-1"></i> Add Car
+                                </a>
+                            </li>
+                        </Authorized>
+                    </AuthorizeView>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/shop?searchTerm=new">
+                            <i class="fa fa-car-battery me-1"></i> New Cars
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/shop?searchTerm=used">
+                            <i class="fa fa-car-crash me-1"></i> Used Cars
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/shop?brand=BMW">
+                            <i class="fab fa-bmw me-1"></i> BMW
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/shop?brand=Mercedes">
+                            <i class="fab fa-mercedes me-1"></i> Mercedes
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/shop?brand=Audi">
+                            <i class="fab fa-audi me-1"></i> Audi
+                        </a>
+                    </li>
+                    
+                </ul>
+
+                <!-- Right Menu (User Actions) -->
+                <ul class="navbar-nav">
+                    <AuthorizeView Roles="Admin,Manager" Context="auth">
+                        <Authorized Context="auth">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fa fa-cog me-1"></i> @(auth.User.IsInRole("Admin") ? "Admin" : "Manager")
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="/admin"><i class="fa fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                                    <li><a class="dropdown-item" href="/admin/approvals"><i class="fa fa-clipboard-check me-2"></i>Pending Approvals</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="/admin/categories"><i class="fa fa-tags me-2"></i>Manage Categories</a></li>
+                                    @if (auth.User.IsInRole("Admin"))
+                                    {
+                                        <li><a class="dropdown-item" href="/admin/users"><i class="fa fa-user-cog me-2"></i>Manage Users</a></li>
+                                        <li><a class="dropdown-item" href="/admin/list-roles"><i class="fa fa-users me-2"></i>Manage Roles</a></li>
+                                    }
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="/admin/orders"><i class="fa fa-shopping-bag me-2"></i>Manage Orders</a></li>
+                                    <li><a class="dropdown-item" href="/admin/rentals"><i class="fa fa-calendar me-2"></i>Rental Management</a></li>
+                                    <li><a class="dropdown-item" href="/admin/analytics"><i class="fa fa-bar-chart me-2"></i>Analytics</a></li>
+                                </ul>
+                            </li>
+                        </Authorized>
+                    </AuthorizeView>
+
+                    <AuthorizeView Roles="Seller,Admin,Manager" Context="auth">
+                        <Authorized>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fa fa-car me-1"></i> My Cars
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="/seller-dashboard"><i class="fa fa-chart-line me-2"></i>Dashboard</a></li>
+                                    <li><a class="dropdown-item" href="/create-listing"><i class="fa fa-plus me-2"></i>Add New Car</a></li>
+                                    <li><a class="dropdown-item" href="/my-listings"><i class="fa fa-list me-2"></i>My Listings</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="/seller/rental-management"><i class="fa fa-calendar me-2"></i>Rental Management</a></li>
+                                </ul>
+                            </li>
+                        </Authorized>
+                    </AuthorizeView>
+
+                    <AuthorizeView Context="auth">
+                        <Authorized>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fa fa-user me-1"></i> @CurrentUserName
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="/buyer-dashboard"><i class="fa fa-chart-line me-2"></i>My Dashboard</a></li>
+                                    <li><a class="dropdown-item" href="/profile"><i class="fa fa-user-edit me-2"></i>My Profile</a></li>
+                                    <li><a class="dropdown-item" href="/my-orders"><i class="fa fa-shopping-bag me-2"></i>My Orders</a></li>
+                                    <li><a class="dropdown-item" href="/my-rentals"><i class="fa fa-calendar me-2"></i>My Rentals</a></li>
+                                    <li><a class="dropdown-item" href="/messages"><i class="fa fa-envelope me-2"></i>Messages</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="/cart"><i class="fa fa-shopping-cart me-2"></i>My Cart</a></li>
+                                    <li><a class="dropdown-item" href="/wishlist"><i class="fa-regular fa-heart me-2"></i>My Wishlist</a></li>
+                                    <li><a class="dropdown-item" href="/compare"><i class="fa fa-exchange me-2"></i>Compare Cars</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item text-danger" href="#" @onclick="HandleLogout">
+                                            <i class="fa fa-sign-out-alt me-2"></i>Logout
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                        </Authorized>
+                        <NotAuthorized>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/login">
+                                    <i class="fa fa-sign-in-alt me-1"></i> Login
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/register">
+                                    <i class="fa fa-user-plus me-1"></i> Register
+                                </a>
+                            </li>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main role="main" class="pb-3">
+        @Body
+    </main>
+
+    <!-- FOOTER -->
+    <footer id="footer" class="bg-dark text-white mt-5">
+        <div class="container py-5">
+            <div class="row">
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5 class="footer-title">About Us</h5>
+                    <p>Your trusted car e-commerce platform in Tunisia. Find your perfect vehicle with ease.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-map-marker-alt me-2"></i>Tunis, Tunisia</li>
+                        <li><i class="fas fa-phone me-2"></i>+216 95 518 4</li>
+                        <li><i class="fas fa-envelope me-2"></i>contact@carecommerce.tn</li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5 class="footer-title">Categories</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="/shop" class="text-white-50"><i class="fas fa-car me-2"></i>All Cars</a></li>
+                        <li><a href="/shop?brand=BMW" class="text-white-50"><i class="fas fa-car me-2"></i>BMW</a></li>
+                        <li><a href="/shop?brand=Mercedes" class="text-white-50"><i class="fas fa-car me-2"></i>Mercedes</a></li>
+                        <li><a href="/shop?brand=Audi" class="text-white-50"><i class="fas fa-car me-2"></i>Audi</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5 class="footer-title">Information</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="/about" class="text-white-50">About Us</a></li>
+                        <li><a href="/contact" class="text-white-50">Contact Us</a></li>
+                        <li><a href="/privacy-policy" class="text-white-50">Privacy Policy</a></li>
+                        <li><a href="/terms" class="text-white-50">Terms & Conditions</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5 class="footer-title">Service</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="/profile" class="text-white-50">My Account</a></li>
+                        <li><a href="/cart" class="text-white-50">View Cart</a></li>
+                        <li><a href="/my-orders" class="text-white-50">My Orders</a></li>
+                        <li><a href="#" class="text-white-50">Help</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="bg-black py-3">
+            <div class="container">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <p class="mb-0 text-white-50">© 2025 Tunisia Motors. All rights reserved.</p>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <div class="payment-methods">
+                            <i class="fab fa-cc-visa text-white me-2"></i>
+                            <i class="fab fa-cc-mastercard text-white me-2"></i>
+                            <i class="fab fa-cc-paypal text-white me-2"></i>
+                            <i class="fab fa-cc-amex text-white"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+@code {
+    [Inject]
+    private IAuthService AuthService { get; set; }
+
+    [Inject]
+    private NavigationManager NavManager { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    private string PageTitle { get; set; } = "Tunisia Motors";
+    private string CurrentUserName { get; set; } = "User";
+    private UserDto CurrentUser { get; set; }
+    private List<CategoryDto> categories = new();
+    private System.Threading.Timer _updateTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Subscribe to authentication state changes
+        AuthStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+
+        // Subscribe to compare service changes
+        CompareService.OnCompareChanged += OnCompareChanged;
+
+        await LoadUserData();
+        await LoadCategories();
+
+        // Debug: Check authentication state
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        Console.WriteLine($"[MainLayout] User authenticated: {user.Identity?.IsAuthenticated}");
+        Console.WriteLine($"[MainLayout] User name: {user.Identity?.Name}");
+        Console.WriteLine($"[MainLayout] User claims: {string.Join(", ", user.Claims.Select(c => $"{c.Type}: {c.Value}"))}");
+        Console.WriteLine($"[MainLayout] User roles: {string.Join(", ", user.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value))}");
+
+        // Start periodic updates
+        _updateTimer = new System.Threading.Timer(async _ => await UpdateBadges(), null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+    }
+
+    private async void OnCompareChanged()
+    {
+        await UpdateBadges();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    {
+        try
+        {
+            Console.WriteLine("[MainLayout] Authentication state changed!");
+            var authState = await task;
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                Console.WriteLine("[MainLayout] User is authenticated, reloading user data...");
+                await LoadUserData();
+                await UpdateBadges();
+            }
+            else
+            {
+                Console.WriteLine("[MainLayout] User is not authenticated");
+                CurrentUserName = "User";
+                CurrentUser = null;
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MainLayout] Error in OnAuthenticationStateChanged: {ex.Message}");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadUserData();
+            await UpdateBadges();
+            StateHasChanged();
+        }
+    }
+
+    private async Task UpdateBadges()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated == true)
+            {
+                // Update cart count
+                var cartResponse = await CartService.GetCartCountAsync();
+                if (cartResponse.Success)
+                {
+                    await JSRuntime.InvokeVoidAsync("updateCartBadge", cartResponse.Data);
+                    // Also update localStorage for backward compatibility
+                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "cart_count", cartResponse.Data.ToString());
+                }
+
+                // Update unread message count
+                var unreadCount = await MessageService.GetUnreadCountAsync();
+                await JSRuntime.InvokeVoidAsync("updateMessageBadge", unreadCount);
+
+                // Update compare count
+                var compareCount = await CompareService.GetCompareCountAsync();
+                await JSRuntime.InvokeVoidAsync("updateCompareBadge", compareCount);
+            }
+            else
+            {
+                // Update compare count even for non-authenticated users (compare uses localStorage)
+                var compareCount = await CompareService.GetCompareCountAsync();
+                await JSRuntime.InvokeVoidAsync("updateCompareBadge", compareCount);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MainLayout] Error updating badges: {ex.Message}");
+        }
+    }
+
+    private async Task LoadUserData()
+    {
+        try
+        {
+            Console.WriteLine("[MainLayout] Loading user data...");
+            CurrentUser = await AuthService.GetCurrentUserAsync();
+
+            if (CurrentUser != null)
+            {
+                Console.WriteLine($"[MainLayout] User loaded: {CurrentUser.Email}");
+                CurrentUserName = CurrentUser.Email ?? CurrentUser.UserName ?? "User";
+            }
+            else
+            {
+                Console.WriteLine("[MainLayout] No user data returned");
+                CurrentUserName = "User";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MainLayout] Error loading user data: {ex.Message}");
+            CurrentUserName = "User";
+        }
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            categories = await CategoryService.GetAllCategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MainLayout] Error loading categories: {ex.Message}");
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        NavManager.NavigateTo("/", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        _updateTimer?.Dispose();
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+        CompareService.OnCompareChanged -= OnCompareChanged;
+    }
+}

@@ -1,0 +1,22 @@
+@using BlazorApp.Models
+
+<span class="badge fs-6 px-3 py-2 @(GetBadgeClass(Status))">@Status.ToString()</span>
+
+@code {
+    [Parameter]
+    public RentalStatus Status { get; set; }
+
+    private string GetBadgeClass(RentalStatus status)
+    {
+        return status switch
+        {
+            RentalStatus.REQUESTED => "bg-warning text-dark",
+            RentalStatus.APPROVED => "bg-info text-white",
+            RentalStatus.ACTIVE => "bg-success text-white",
+            RentalStatus.OVERDUE => "bg-danger text-white",
+            RentalStatus.RETURNED => "bg-primary text-white",
+            RentalStatus.CANCELLED => "bg-secondary text-white",
+            _ => "bg-light text-dark"
+        };
+    }
+}

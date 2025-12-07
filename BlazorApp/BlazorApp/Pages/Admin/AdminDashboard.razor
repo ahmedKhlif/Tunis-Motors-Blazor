@@ -1,0 +1,578 @@
+@page "/admin"
+@page "/admin/dashboard"
+@using BlazorApp.Models
+@using BlazorApp.Services
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject NavigationManager NavigationManager
+@inject IAuthService AuthService
+@inject IDashboardService DashboardService
+@inject ICarRentalService CarRentalService
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Admin Dashboard</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li class="active">Dashboard</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+        <div class="row">
+
+            <!-- Statistics Cards - Row 1 -->
+            <div class="row mb-4">
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-primary border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Listings</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(stats?.TotalListings ?? 0)</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-check-circle text-success"></i> @(stats?.ApprovedListings ?? 0) Approved
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-car fa-3x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-warning border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Approvals</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(stats?.PendingApprovals ?? 0)</h3>
+                                    <small class="text-muted">
+                                        @if ((stats?.PendingApprovals ?? 0) > 0)
+                                        {
+                                            <span class="text-danger"><i class="fa fa-exclamation-circle"></i> Needs Review</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-success"><i class="fa fa-check"></i> All Clear</span>
+                                        }
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-clock fa-3x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-success border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Users</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(stats?.TotalUsers ?? 0)</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-user-plus"></i> Registered Members
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-users fa-3x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-info border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Total Orders</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(stats?.TotalOrders ?? 0)</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-shopping-bag"></i> Completed Transactions
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-shopping-cart fa-3x text-info opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-primary border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Active Rentals</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(rentalStats?.ActiveRentals ?? 0)</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-calendar-check"></i> Currently Active
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-calendar fa-3x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-warning border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Rentals</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(rentalStats?.PendingRequests ?? 0)</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-clock"></i> Awaiting Approval
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-hourglass-half fa-3x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-danger border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Overdue Rentals</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(rentalStats?.OverdueRentals ?? 0)</h3>
+                                    <small class="text-muted">
+                                        @if ((rentalStats?.OverdueRentals ?? 0) > 0)
+                                        {
+                                            <span class="text-danger"><i class="fa fa-exclamation-triangle"></i> Needs Action</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-success"><i class="fa fa-check"></i> All On Time</span>
+                                        }
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-exclamation-circle fa-3x text-danger opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-success border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Rental Revenue</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(rentalStats?.MonthlyRevenue.ToString("N0") ?? "0") TND</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-chart-line"></i> This Month
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-dollar fa-3x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Cards - Row 2 (Additional Metrics) -->
+            <div class="row mb-4">
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-danger border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Total Messages</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(stats?.TotalMessages ?? 0)</h3>
+                                    <small class="text-muted">
+                                        @if ((stats?.UnreadMessages ?? 0) > 0)
+                                        {
+                                            <span class="text-danger"><i class="fa fa-envelope"></i> @(stats?.UnreadMessages ?? 0) Unread</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-success"><i class="fa fa-check"></i> All Read</span>
+                                        }
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-comments fa-3x text-danger opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-secondary border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">Approval Rate</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@GetApprovalRate()%</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-chart-line"></i> @(stats?.ApprovedListings ?? 0) of @(stats?.TotalListings ?? 0)
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-percentage fa-3x text-secondary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-dark border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">Avg. Orders/User</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@GetAvgOrdersPerUser()</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-user-circle"></i> Activity Metric
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-chart-bar fa-3x text-dark opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-primary border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Active Listings</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@(stats?.ApprovedListings ?? 0)</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-eye"></i> Available Now
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-check-double fa-3x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fa fa-bolt me-2"></i>Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <a href="/admin/approvals" class="btn btn-warning w-100">
+                                        <i class="fa fa-check-circle me-2"></i>Review Approvals (@(stats?.PendingApprovals ?? 0))
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <a href="/admin/users" class="btn btn-primary w-100">
+                                        <i class="fa fa-users me-2"></i>Manage Users
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <a href="/analytics" class="btn btn-info w-100">
+                                        <i class="fa fa-chart-bar me-2"></i>View Analytics
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <a href="/admin/rentals" class="btn btn-primary w-100">
+                                        <i class="fa fa-calendar me-2"></i>Rental Dashboard
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <a href="/admin/list-roles" class="btn btn-secondary w-100">
+                                        <i class="fa fa-user-cog me-2"></i>Manage Roles
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="row">
+                <!-- Recent Listings -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fa fa-car me-2"></i>Recent Car Listings</h5>
+                            <span class="badge bg-light text-dark">@(stats?.RecentListings?.Count ?? 0)</span>
+                        </div>
+                        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                            @if (stats?.RecentListings != null && stats.RecentListings.Any())
+                            {
+                                @foreach (var listing in stats.RecentListings)
+                                {
+                                    <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1 text-dark">@listing.Name</h6>
+                                            <small class="text-muted">
+                                                <i class="fa fa-user me-1"></i>@listing.SellerName • 
+                                                <i class="fa fa-tag ms-2 me-1"></i>@listing.Price.ToString("N0") TND
+                                            </small>
+                                            <br />
+                                            <small class="text-muted">
+                                                <i class="fa fa-clock me-1"></i>@listing.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                                            </small>
+                                        </div>
+                                        <div class="text-end">
+                                            @if (listing.IsApproved)
+                                            {
+                                                <span class="badge bg-success"><i class="fa fa-check"></i> Approved</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning text-dark"><i class="fa fa-clock"></i> Pending</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="text-center py-4">
+                                    <i class="fa fa-car fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted mb-0">No recent listings</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Orders -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fa fa-shopping-bag me-2"></i>Recent Orders</h5>
+                            <span class="badge bg-light text-dark">@(stats?.RecentOrders?.Count ?? 0)</span>
+                        </div>
+                        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                            @if (stats?.RecentOrders != null && stats.RecentOrders.Any())
+                            {
+                                @foreach (var order in stats.RecentOrders)
+                                {
+                                    <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1 text-dark">Order #@order.OrderNumber</h6>
+                                            <small class="text-muted">
+                                                <i class="fa fa-box me-1"></i>@order.ItemCount items • 
+                                                <i class="fa fa-dollar-sign ms-2 me-1"></i>@order.TotalAmount.ToString("N0") TND
+                                            </small>
+                                            <br />
+                                            <small class="text-muted">
+                                                <i class="fa fa-calendar me-1"></i>@order.OrderDate.ToString("MMM dd, yyyy HH:mm")
+                                            </small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge @GetOrderStatusBadgeClass(order.Status)">@order.Status</span>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="text-center py-4">
+                                    <i class="fa fa-shopping-cart fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted mb-0">No recent orders</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Messages -->
+            @if (stats?.PendingMessages != null && stats.PendingMessages.Any())
+            {
+                <div class="row">
+                    <div class="col-12 mb-4">
+                        <div class="card shadow">
+                            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fa fa-envelope me-2"></i>Pending Messages</h5>
+                                <span class="badge bg-light text-dark">@(stats?.PendingMessages?.Count ?? 0)</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    @foreach (var message in stats.PendingMessages.Take(6))
+                                    {
+                                        <div class="col-md-6 mb-3">
+                                            <div class="alert alert-warning mb-0 d-flex align-items-center">
+                                                <div class="flex-grow-1">
+                                                    <strong><i class="fa fa-user me-1"></i>@message.SenderName</strong>
+                                                    <p class="mb-0 small">@message.Subject</p>
+                                                    <small class="text-muted">
+                                                        <i class="fa fa-clock me-1"></i>@message.SentAt.ToString("MMM dd, yyyy HH:mm")
+                                                    </small>
+                                                </div>
+                                                <a href="/messages" class="btn btn-sm btn-outline-warning ms-2">
+                                                    <i class="fa fa-eye"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private DashboardStatsDto stats;
+    private RentalStatisticsDto rentalStats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is admin
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        // Check for admin role
+        var roles = currentUser.Roles ?? new List<string>();
+        if (!roles.Contains("Admin") && !roles.Contains("Manager"))
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+
+        await RefreshData();
+    }
+
+    private async Task RefreshData()
+    {
+        try
+        {
+            // Load dashboard stats from API
+            stats = await DashboardService.GetStatsAsync();
+
+            // Load rental statistics
+            var rentalStatsResponse = await CarRentalService.GetRentalStatisticsAsync();
+            if (rentalStatsResponse.Success)
+            {
+                rentalStats = rentalStatsResponse.Data;
+            }
+            else
+            {
+                rentalStats = new RentalStatisticsDto
+                {
+                    TotalRentals = 0,
+                    PendingRequests = 0,
+                    ActiveRentals = 0,
+                    OverdueRentals = 0,
+                    ReturnedToday = 0,
+                    ReturnedThisWeek = 0,
+                    ReturnedThisMonth = 0,
+                    TotalRevenue = 0,
+                    MonthlyRevenue = 0,
+                    AverageRentalDuration = 0
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard stats: {ex.Message}");
+            // Fallback to empty stats if API fails
+            stats = new DashboardStatsDto
+            {
+                TotalListings = 0,
+                PendingApprovals = 0,
+                ApprovedListings = 0,
+                TotalUsers = 0,
+                TotalOrders = 0,
+                TotalMessages = 0,
+                UnreadMessages = 0,
+                RecentListings = new List<RecentListingDto>(),
+                RecentOrders = new List<RecentOrderDto>(),
+                PendingMessages = new List<PendingMessageDto>()
+            };
+
+            rentalStats = new RentalStatisticsDto
+            {
+                TotalRentals = 0,
+                PendingRequests = 0,
+                ActiveRentals = 0,
+                OverdueRentals = 0,
+                ReturnedToday = 0,
+                ReturnedThisWeek = 0,
+                ReturnedThisMonth = 0,
+                TotalRevenue = 0,
+                MonthlyRevenue = 0,
+                AverageRentalDuration = 0
+            };
+        }
+    }
+
+    private string GetApprovalRate()
+    {
+        if (stats == null || stats.TotalListings == 0)
+            return "0";
+        
+        var rate = (decimal)stats.ApprovedListings / stats.TotalListings * 100;
+        return rate.ToString("F1");
+    }
+
+    private string GetAvgOrdersPerUser()
+    {
+        if (stats == null || stats.TotalUsers == 0)
+            return "0";
+        
+        var avg = (decimal)stats.TotalOrders / stats.TotalUsers;
+        return avg.ToString("F1");
+    }
+
+    private string GetOrderStatusBadgeClass(string status)
+    {
+        return status?.ToLower() switch
+        {
+            "pending" => "bg-warning text-dark",
+            "processing" => "bg-info",
+            "completed" => "bg-success",
+            "shipped" => "bg-primary",
+            "delivered" => "bg-success",
+            "cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}

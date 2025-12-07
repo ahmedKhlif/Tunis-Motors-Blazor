@@ -1,0 +1,735 @@
+@page "/seller/rental-management"
+@attribute [Authorize(Roles = "Seller,Admin,Manager")]
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using BlazorApp.Components
+@using BlazorApp.Pages.Admin
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
+@inject ICarRentalService RentalService
+@inject IAuthService AuthService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavManager
+
+<PageTitle>Rental Management - Tunisia Motors</PageTitle>
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Rental Management</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/seller-dashboard">Seller Dashboard</a></li>
+                    <li class="active">Rental Management</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="section-title">My Cars Rental Management</h2>
+                <p class="section-subtitle">Manage rental requests for your cars - approve, reject, and track all rentals</p>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        @if (statistics != null)
+        {
+            <div class="row mb-4">
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-warning border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Requests</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.PendingRequests</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-clock"></i> Awaiting Approval
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-clock-o fa-3x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-primary border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Active Rentals</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.ActiveRentals</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-car"></i> Currently Active
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-car fa-3x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-danger border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Overdue Rentals</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.OverdueRentals</h3>
+                                    <small class="text-muted">
+                                        @if (statistics.OverdueRentals > 0)
+                                        {
+                                            <span class="text-danger"><i class="fa fa-exclamation-triangle"></i> Needs Action</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-success"><i class="fa fa-check"></i> All On Time</span>
+                                        }
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-exclamation-triangle fa-3x text-danger opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-success border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Monthly Revenue</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.MonthlyRevenue.ToString("N0") TND</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-chart-line"></i> This Month
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-dollar fa-3x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- View Toggle Buttons -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="btn-group" role="group">
+                    <button class="btn @(viewMode == "list" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="@(() => ChangeViewMode("list"))">
+                        <i class="fa fa-list"></i> List View
+                    </button>
+                    <button class="btn @(viewMode == "calendar" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="@(() => ChangeViewMode("calendar"))">
+                        <i class="fa fa-calendar"></i> Calendar View
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @if (viewMode == "list")
+        {
+            <!-- Tabs Navigation -->
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link @(activeTab == "pending" ? "active" : "")"
+                            @onclick="@(() => SetActiveTab("pending"))">
+                        Pending Requests (@pendingRentals.Count)
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(activeTab == "active" ? "active" : "")"
+                            @onclick="@(() => SetActiveTab("active"))">
+                        Active Rentals (@activeRentals.Count)
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(activeTab == "history" ? "active" : "")"
+                            @onclick="@(() => SetActiveTab("history"))">
+                        History (@historyRentals.Count)
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                @if (activeTab == "pending")
+                {
+                    <div class="table-responsive">
+                        @if (pendingRentals.Any())
+                        {
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Car</th>
+                                        <th>Customer</th>
+                                        <th>Pickup Date</th>
+                                        <th>Return Date</th>
+                                        <th>Duration</th>
+                                        <th>Total Cost</th>
+                                        <th>Requested</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var rental in pendingRentals)
+                                    {
+                                        <tr>
+                                            <td><strong>@rental.CarName</strong></td>
+                                            <td>
+                                                <strong>@rental.UserName</strong><br />
+                                                <small class="text-muted">@rental.UserEmail</small>
+                                            </td>
+                                            <td>@(rental.PickupDate?.ToString("MMM dd, yyyy") ?? "N/A")</td>
+                                            <td>@(rental.ReturnDueDate?.ToString("MMM dd, yyyy") ?? "N/A")</td>
+                                            <td>@((rental.ReturnDueDate != null && rental.PickupDate != null) ? (rental.ReturnDueDate.Value - rental.PickupDate.Value).Days + " days" : "N/A")</td>
+                                            <td><strong>@(rental.DailyRate?.ToString("N2") ?? "0.00") TND</strong></td>
+                                            <td>@rental.RequestedAt.ToString("MMM dd, yyyy")</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-success" title="Approve"
+                                                            @onclick="@(() => HandleApproveRental(rental))">
+                                                        <i class="fa fa-check"></i>
+                                                    </button>
+                                                    <button class="btn btn-danger" title="Reject"
+                                                            @onclick="@(() => HandleRejectRental(rental))">
+                                                        <i class="fa fa-times"></i>
+                                                    </button>
+                                                    <button class="btn btn-info" title="View Details"
+                                                            @onclick="@(() => ViewDetails(rental.Id))">
+                                                        <i class="fa fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                <i class="fa fa-info-circle"></i> No pending rental requests for your cars.
+                            </div>
+                        }
+                    </div>
+                }
+                else if (activeTab == "active")
+                {
+                    <div class="table-responsive">
+                        @if (activeRentals.Any())
+                        {
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Car</th>
+                                        <th>Customer</th>
+                                        <th>Pickup Date</th>
+                                        <th>Return Date</th>
+                                        <th>Status</th>
+                                        <th>Total Cost</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var rental in activeRentals)
+                                    {
+                                        <tr>
+                                            <td><strong>@rental.CarName</strong></td>
+                                            <td>
+                                                <strong>@rental.UserName</strong><br />
+                                                <small class="text-muted">@rental.UserEmail</small>
+                                            </td>
+                                            <td>@(rental.PickupDate?.ToString("MMM dd, yyyy") ?? "N/A")</td>
+                                            <td>@(rental.ReturnDueDate?.ToString("MMM dd, yyyy") ?? "N/A")</td>
+                                            <td>
+                                                <span class="badge @GetStatusBadge(rental.Status)">
+                                                    @rental.Status
+                                                </span>
+                                            </td>
+                                            <td><strong>@((rental.DailyRate * ((rental.ReturnDueDate - rental.PickupDate)?.Days ?? 0))?.ToString("N2") ?? "0.00") TND</strong></td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    @if (rental.Status == RentalStatus.APPROVED)
+                                                    {
+                                                        <button class="btn btn-primary" title="Mark Active"
+                                                                @onclick="@(() => HandleActivateRental(rental))">
+                                                            <i class="fa fa-play"></i>
+                                                        </button>
+                                                    }
+                                                    @if (rental.Status == RentalStatus.ACTIVE)
+                                                    {
+                                                        <button class="btn btn-success" title="Complete Return"
+                                                                @onclick="@(() => HandleReturnRental(rental))">
+                                                            <i class="fa fa-check-square"></i>
+                                                        </button>
+                                                        <button class="btn btn-warning" title="Extend"
+                                                                @onclick="@(() => HandleExtendRental(rental))">
+                                                            <i class="fa fa-calendar-plus"></i>
+                                                        </button>
+                                                    }
+                                                    <button class="btn btn-info" title="View Details"
+                                                            @onclick="@(() => ViewDetails(rental.Id))">
+                                                        <i class="fa fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                <i class="fa fa-info-circle"></i> No active rentals for your cars.
+                            </div>
+                        }
+                    </div>
+                }
+                else if (activeTab == "history")
+                {
+                    <div class="table-responsive">
+                        @if (historyRentals.Any())
+                        {
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Car</th>
+                                        <th>Customer</th>
+                                        <th>Rental Period</th>
+                                        <th>Status</th>
+                                        <th>Total Cost</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var rental in historyRentals)
+                                    {
+                                        <tr>
+                                            <td><strong>@rental.CarName</strong></td>
+                                            <td>
+                                                <strong>@rental.UserName</strong><br />
+                                                <small class="text-muted">@rental.UserEmail</small>
+                                            </td>
+                                            <td>
+                                                @(rental.PickupDate?.ToString("MMM dd, yyyy") ?? "N/A") - @(rental.ReturnedAt?.ToString("MMM dd, yyyy") ?? rental.ReturnDueDate?.ToString("MMM dd, yyyy") ?? "N/A")<br />
+                                                <small class="text-muted">@((rental.ReturnDueDate != null && rental.PickupDate != null) ? (rental.ReturnDueDate.Value - rental.PickupDate.Value).Days + " days" : "N/A")</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge @GetStatusBadge(rental.Status)">
+                                                    @rental.Status
+                                                </span>
+                                            </td>
+                                            <td><strong>@((rental.DailyRate * ((rental.ReturnDueDate - rental.PickupDate)?.Days ?? 0))?.ToString("N2") ?? "0.00") TND</strong></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-info" title="View Details"
+                                                        @onclick="@(() => ViewDetails(rental.Id))">
+                                                    <i class="fa fa-eye"></i> View Details
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                <i class="fa fa-info-circle"></i> No rental history for your cars.
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+        else if (viewMode == "calendar")
+        {
+            <!-- Calendar View -->
+            <div class="card">
+                <div class="card-body">
+                    <div id="sellerRentalCalendar"></div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+<!-- /SECTION -->
+
+<!-- Approve Modal -->
+@if (showApproveModal && selectedRental != null)
+{
+    <ApproveRentalModal Rental="selectedRental"
+                      OnConfirm="ConfirmApproveRental"
+                      OnCancel="@(() => showApproveModal = false)" />
+}
+
+<!-- Reject Modal -->
+@if (showRejectModal && selectedRental != null)
+{
+    <RejectRentalModal Rental="selectedRental"
+                     OnConfirm="ConfirmRejectRental"
+                     OnCancel="@(() => showRejectModal = false)" />
+}
+
+<!-- Return Modal -->
+@if (showReturnModal && selectedRental != null)
+{
+    <ReturnRentalModal Rental="selectedRental"
+                     OnConfirm="ConfirmReturnRental"
+                     OnCancel="@(() => showReturnModal = false)" />
+}
+
+<!-- Extend Modal -->
+@if (showExtendModal && selectedRental != null)
+{
+    <ExtendRentalModal Rental="selectedRental"
+                     OnConfirm="ConfirmExtendRental"
+                     OnCancel="@(() => showExtendModal = false)" />
+}
+
+<!-- Notification Dialog -->
+<NotificationDialog @bind-Show="showNotification" 
+                  Title="@notificationTitle" 
+                  Message="@notificationMessage" 
+                  Type="@notificationType"
+                  OnClose="OnNotificationClose" />
+
+@code {
+    private RentalStatisticsDto statistics = new();
+    private List<CarRentalDto> allRentals = new();
+    private List<CarRentalDto> pendingRentals = new();
+    private List<CarRentalDto> activeRentals = new();
+    private List<CarRentalDto> historyRentals = new();
+    
+    private string activeTab = "pending";
+    private string viewMode = "list";
+    private string currentUserId = string.Empty;
+    
+    private CarRentalDto? selectedRental;
+    private bool showApproveModal = false;
+    private bool showRejectModal = false;
+    private bool showReturnModal = false;
+    private bool showExtendModal = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentUser();
+        await LoadData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (viewMode == "calendar")
+        {
+            await InitializeCalendarAsync();
+        }
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        if (user != null)
+        {
+            currentUserId = user.Id;
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            // Load statistics for seller's cars only
+            var statsResponse = await RentalService.GetRentalStatisticsAsync();
+            if (statsResponse.Success)
+            {
+                statistics = statsResponse.Data;
+            }
+
+            // Load all rentals for seller's cars
+            var rentalsResponse = await RentalService.GetSellerRentalsAsync(currentUserId);
+            if (rentalsResponse.Success)
+            {
+                allRentals = rentalsResponse.Data.ToList();
+                FilterRentals();
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error", $"Error loading data: {ex.Message}", NotificationType.Error);
+        }
+    }
+
+    private void FilterRentals()
+    {
+        pendingRentals = allRentals.Where(r => r.Status == RentalStatus.REQUESTED).ToList();
+        activeRentals = allRentals.Where(r => r.Status == RentalStatus.APPROVED || r.Status == RentalStatus.ACTIVE).ToList();
+        historyRentals = allRentals.Where(r => 
+            r.Status == RentalStatus.RETURNED || 
+            r.Status == RentalStatus.CANCELLED).ToList();
+    }
+
+    private async Task SetActiveTab(string tab)
+    {
+        activeTab = tab;
+        StateHasChanged();
+    }
+
+    private async Task ChangeViewMode(string mode)
+    {
+        viewMode = mode;
+        StateHasChanged();
+        
+        if (mode == "calendar")
+        {
+            await Task.Delay(100);
+            await InitializeCalendarAsync();
+        }
+    }
+
+    private async Task InitializeCalendarAsync()
+    {
+        try
+        {
+            var start = DateTime.Today;
+            var end = DateTime.Today.AddMonths(3);
+            var events = await RentalService.GetSellerCalendarEventsAsync(start, end);
+            if (events.Success)
+            {
+                await JSRuntime.InvokeVoidAsync("initializeSellerRentalCalendar", events.Data);
+            }
+            else
+            {
+                Console.WriteLine($"Calendar error: {events.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Calendar initialization error: {ex.Message}");
+        }
+    }
+
+    private void HandleApproveRental(CarRentalDto rental)
+    {
+        selectedRental = rental;
+        showApproveModal = true;
+    }
+
+    private void HandleRejectRental(CarRentalDto rental)
+    {
+        selectedRental = rental;
+        showRejectModal = true;
+    }
+
+    private void HandleReturnRental(CarRentalDto rental)
+    {
+        selectedRental = rental;
+        showReturnModal = true;
+    }
+
+    private void HandleExtendRental(CarRentalDto rental)
+    {
+        selectedRental = rental;
+        showExtendModal = true;
+    }
+
+    private void HandleActivateRental(CarRentalDto rental)
+    {
+        selectedRental = rental;
+        ConfirmActivateRental();
+    }
+
+    private async Task ConfirmApproveRental(ApproveRentalDto model)
+    {
+        try
+        {
+            var response = await RentalService.ApproveRentalAsync(selectedRental.Id, model);
+            if (response.Success)
+            {
+                ShowNotification("Success", "Rental approved successfully!", NotificationType.Success);
+                showApproveModal = false;
+                await LoadData();
+            }
+            else
+            {
+                ShowNotification("Error", response.Message ?? "Failed to approve rental", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error", $"Error: {ex.Message}", NotificationType.Error);
+        }
+    }
+
+    private async Task ConfirmRejectRental(string reason)
+    {
+        try
+        {
+            var response = await RentalService.RejectRentalAsync(selectedRental.Id, reason);
+            if (response.Success)
+            {
+                ShowNotification("Success", "Rental rejected successfully!", NotificationType.Success);
+                showRejectModal = false;
+                await LoadData();
+            }
+            else
+            {
+                ShowNotification("Error", response.Message ?? "Failed to reject rental", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error", $"Error: {ex.Message}", NotificationType.Error);
+        }
+    }
+
+    private async Task ConfirmActivateRental()
+    {
+        try
+        {
+            var response = await RentalService.ActivateRentalAsync(selectedRental.Id);
+            if (response.Success)
+            {
+                ShowNotification("Success", "Rental activated successfully!", NotificationType.Success);
+                await LoadData();
+            }
+            else
+            {
+                ShowNotification("Error", response.Message ?? "Failed to activate rental", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error", $"Error: {ex.Message}", NotificationType.Error);
+        }
+    }
+
+    private async Task ConfirmReturnRental(ReturnRentalDto model)
+    {
+        try
+        {
+            var response = await RentalService.ReturnRentalAsync(selectedRental.Id, model);
+            if (response.Success)
+            {
+                ShowNotification("Success", "Rental return completed successfully!", NotificationType.Success);
+                showReturnModal = false;
+                await LoadData();
+            }
+            else
+            {
+                ShowNotification("Error", response.Message ?? "Failed to complete return", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error", $"Error: {ex.Message}", NotificationType.Error);
+        }
+    }
+
+    private async Task ConfirmExtendRental(ExtendRentalDto model)
+    {
+        try
+        {
+            var response = await RentalService.ExtendRentalAsync(selectedRental.Id, model);
+            if (response.Success)
+            {
+                ShowNotification("Success", "Rental extended successfully!", NotificationType.Success);
+                showExtendModal = false;
+                await LoadData();
+            }
+            else
+            {
+                ShowNotification("Error", response.Message ?? "Failed to extend rental", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error", $"Error: {ex.Message}", NotificationType.Error);
+        }
+    }
+
+    private void ViewDetails(int rentalId)
+    {
+        NavManager.NavigateTo($"/rental/{rentalId}");
+    }
+
+    private string GetStatusBadge(RentalStatus status)
+    {
+        return status switch
+        {
+            RentalStatus.REQUESTED => "bg-warning text-dark",
+            RentalStatus.APPROVED => "bg-info",
+            RentalStatus.ACTIVE => "bg-primary",
+            RentalStatus.RETURNED => "bg-success",
+            RentalStatus.CANCELLED => "bg-secondary",
+            RentalStatus.OVERDUE => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+    
+    // Notification dialog
+    private bool showNotification = false;
+    private string notificationTitle = "";
+    private string notificationMessage = "";
+    private NotificationType notificationType = NotificationType.Info;
+    
+    private void ShowNotification(string title, string message, NotificationType type = NotificationType.Info)
+    {
+        notificationTitle = title;
+        notificationMessage = message;
+        notificationType = type;
+        showNotification = true;
+        StateHasChanged();
+    }
+    
+    private void OnNotificationClose()
+    {
+        showNotification = false;
+        StateHasChanged();
+    }
+}
+
+<style>
+    .text-xs {
+        font-size: 0.75rem;
+    }
+
+    .nav-tabs .nav-link {
+        color: #666;
+        border: none;
+        border-bottom: 2px solid transparent;
+        padding: 12px 20px;
+        font-weight: 500;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #D10024;
+        border-bottom-color: #D10024;
+        background: transparent;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    #sellerRentalCalendar {
+        min-height: 600px;
+    }
+</style>

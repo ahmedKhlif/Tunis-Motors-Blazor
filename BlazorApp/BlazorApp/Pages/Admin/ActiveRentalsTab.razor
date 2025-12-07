@@ -1,0 +1,129 @@
+@using BlazorApp.Models
+@inject NavigationManager NavManager
+@inject IConfiguration Configuration
+
+<div class="rental-list">
+    @if (IsLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading active rentals...</p>
+        </div>
+    }
+    else if (!Rentals.Any())
+    {
+        <div class="text-center py-5">
+            <i class="fa fa-car fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">No Active Rentals</h4>
+            <p class="text-muted">All rentals have been returned or completed.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Car</th>
+                        <th>Customer</th>
+                        <th>Pickup Date</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var rental in Rentals)
+                    {
+                        <tr class="@(rental.IsOverdue ? "table-danger" : "")">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <img src="@GetImageUrl(rental.CarImage)" alt="@rental.CarName"
+                                         class="car-thumbnail me-2" style="width: 50px; height: 35px; object-fit: cover;">
+                                    <div>
+                                        <div class="fw-bold">@rental.CarName</div>
+                                        <small class="text-muted">@rental.TotalCost.ToString("N0") TND total</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <div class="fw-bold">@rental.UserName</div>
+                                    <small class="text-muted">@rental.UserEmail</small>
+                                </div>
+                            </td>
+                            <td>@rental.FormattedPickupDate</td>
+                            <td>
+                                <div>
+                                    <div>@rental.FormattedReturnDueDate</div>
+                                    @if (rental.RemainingDays > 0)
+                                    {
+                                        <small class="text-success">@rental.RemainingDays day@(rental.RemainingDays != 1 ? "s" : "") left</small>
+                                    }
+                                    else if (rental.OverdueDays > 0)
+                                    {
+                                        <small class="text-danger">@rental.OverdueDays day@(rental.OverdueDays != 1 ? "s" : "") overdue</small>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                @if (rental.IsOverdue)
+                                {
+                                    <span class="badge bg-danger">
+                                        <i class="fa fa-exclamation-triangle"></i> OVERDUE
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">
+                                        <i class="fa fa-check-circle"></i> ACTIVE
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-info"
+                                            @onclick="@(() => NavManager.NavigateTo($"/rental/{rental.Id}"))">
+                                        <i class="fa fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-primary"
+                                            @onclick="@(() => OnReturn.InvokeAsync(rental))">
+                                        <i class="fa fa-undo"></i> Return
+                                    </button>
+                                    <button class="btn btn-sm btn-warning"
+                                            @onclick="@(() => OnExtend.InvokeAsync(rental))">
+                                        <i class="fa fa-plus"></i> Extend
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<CarRentalDto> Rentals { get; set; } = new();
+    [Parameter] public EventCallback<CarRentalDto> OnReturn { get; set; }
+    [Parameter] public EventCallback<CarRentalDto> OnExtend { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+            return "/images/noimage.jpg";
+
+        if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://"))
+            return imagePath;
+
+        var apiBaseUrl = Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5237";
+        if (imagePath.StartsWith("/"))
+            return $"{apiBaseUrl}{imagePath}";
+
+        return $"{apiBaseUrl}/images/{imagePath}";
+    }
+}

@@ -1,0 +1,217 @@
+@using BlazorApp.Models
+@inject NavigationManager NavManager
+@inject IConfiguration Configuration
+
+<div class="rental-list">
+    @if (IsLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading rental history...</p>
+        </div>
+    }
+    else if (!Rentals.Any())
+    {
+        <div class="text-center py-5">
+            <i class="fa fa-history fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">No Rental History</h4>
+            <p class="text-muted">No completed rentals found.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Filters -->
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <select class="form-select" @bind="statusFilter" @bind:after="ApplyFilters">
+                    <option value="">All Statuses</option>
+                    <option value="RETURNED">Returned</option>
+                    <option value="CANCELLED">Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="date" class="form-control" @bind-value="startDateFilter" @bind-value:after="ApplyFiltersAsync">
+            </div>
+            <div class="col-md-3">
+                <input type="date" class="form-control" @bind-value="endDateFilter" @bind-value:after="ApplyFiltersAsync">
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+                    <i class="fa fa-times"></i> Clear Filters
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Car</th>
+                        <th>Customer</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Total Cost</th>
+                        <th>Completed</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var rental in FilteredRentals)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <img src="@GetImageUrl(rental.CarImage)" alt="@rental.CarName"
+                                         class="car-thumbnail me-2" style="width: 50px; height: 35px; object-fit: cover;">
+                                    <div>
+                                        <div class="fw-bold">@rental.CarName</div>
+                                        <small class="text-muted">
+                                            @if (rental.InitialMileage.HasValue && rental.ReturnMileage.HasValue)
+                                            {
+                                                var miles = rental.ReturnMileage.Value - rental.InitialMileage.Value;
+                                                <text>@miles miles driven</text>
+                                            }
+                                        </small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <div class="fw-bold">@rental.UserName</div>
+                                    <small class="text-muted">@rental.UserEmail</small>
+                                </div>
+                            </td>
+                            <td>
+                                @if (rental.PickupDate.HasValue && rental.ReturnedAt.HasValue)
+                                {
+                                    var days = (rental.ReturnedAt.Value - rental.PickupDate.Value).Days;
+                                    <span>@days day@(days != 1 ? "s" : "")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>
+                                @if (rental.Status == RentalStatus.RETURNED)
+                                {
+                                    <span class="badge bg-success">
+                                        <i class="fa fa-check-circle"></i> RETURNED
+                                    </span>
+                                }
+                                else if (rental.Status == RentalStatus.CANCELLED)
+                                {
+                                    <span class="badge bg-secondary">
+                                        <i class="fa fa-ban"></i> CANCELLED
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                @if (rental.TotalCost > 0)
+                                {
+                                    <span class="fw-bold">@rental.TotalCost.ToString("N0") TND</span>
+                                    @if (rental.LateFees > 0)
+                                    {
+                                        <br><small class="text-danger">Late fees: @rental.LateFees.Value.ToString("N0") TND</small>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>
+                                @if (rental.ReturnedAt.HasValue)
+                                {
+                                    <span>@rental.FormattedReturnedDate</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-info"
+                                        @onclick="@(() => NavManager.NavigateTo($"/rental/{rental.Id}"))">
+                                    <i class="fa fa-eye"></i> Details
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Export Button -->
+        <div class="text-end mt-3">
+            <button class="btn btn-outline-primary" @onclick="ExportToCsv">
+                <i class="fa fa-download"></i> Export to CSV
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<CarRentalDto> Rentals { get; set; } = new();
+    [Parameter] public bool IsLoading { get; set; }
+
+    private string statusFilter = "";
+    private DateTime? startDateFilter = null;
+    private DateTime? endDateFilter = null;
+
+    private List<CarRentalDto> FilteredRentals => Rentals.Where(r =>
+    {
+        var statusMatch = string.IsNullOrEmpty(statusFilter) ||
+                         r.Status.ToString() == statusFilter;
+
+        var startDateMatch = !startDateFilter.HasValue ||
+                           (r.ReturnedAt?.Date >= startDateFilter.Value.Date);
+
+        var endDateMatch = !endDateFilter.HasValue ||
+                          (r.ReturnedAt?.Date <= endDateFilter.Value.Date);
+
+        return statusMatch && startDateMatch && endDateMatch;
+    }).ToList();
+
+    private void ApplyFilters()
+    {
+        StateHasChanged();
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        await Task.CompletedTask;
+        StateHasChanged();
+    }
+
+    private void ClearFilters()
+    {
+        statusFilter = "";
+        startDateFilter = null;
+        endDateFilter = null;
+        StateHasChanged();
+    }
+
+    private async Task ExportToCsv()
+    {
+        // Implementation for CSV export would go here
+        await Task.CompletedTask; // Placeholder
+    }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+            return "/images/noimage.jpg";
+
+        if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://"))
+            return imagePath;
+
+        var apiBaseUrl = Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5237";
+        if (imagePath.StartsWith("/"))
+            return $"{apiBaseUrl}{imagePath}";
+
+        return $"{apiBaseUrl}/images/{imagePath}";
+    }
+}

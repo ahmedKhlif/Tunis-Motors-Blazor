@@ -1,0 +1,94 @@
+@using BlazorApp.Models
+@using BlazorApp.Services
+@inject ICarListingService CarListingService
+
+<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Approve Rental Request</h5>
+                <button type="button" class="btn-close" @onclick="OnCancel"></button>
+            </div>
+            <div class="modal-body">
+                <div class="rental-summary mb-3">
+                    <h6>Rental Details:</h6>
+                    <p><strong>Car:</strong> @Rental.CarName</p>
+                    <p><strong>Customer:</strong> @Rental.UserName (@Rental.UserEmail)</p>
+                    <p><strong>Duration:</strong> @Rental.FormattedPickupDate - @Rental.FormattedReturnDueDate</p>
+                    <p><strong>Requested:</strong> @Rental.FormattedRequestedDate</p>
+                    @if (carListing != null && carListing.DailyRentalRate.HasValue)
+                    {
+                        <p class="text-info"><i class="fa fa-info-circle"></i> Car's default rate: <strong>@carListing.DailyRentalRate.Value.ToString("N0") TND/day</strong></p>
+                    }
+                </div>
+
+                <form>
+                    <div class="mb-3">
+                        <label for="dailyRate" class="form-label">Daily Rate (TND)</label>
+                        <input type="number" class="form-control" id="dailyRate"
+                               @bind="model.DailyRate" min="1" step="0.01" required>
+                        <div class="form-text">Set the daily rental rate for this car. Default: @(carListing?.DailyRentalRate?.ToString("N0") ?? "N/A") TND/day</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Approval Notes (Optional)</label>
+                        <textarea class="form-control" id="notes" rows="3"
+                                  @bind="model.Notes" placeholder="Add any notes about this approval..."></textarea>
+                    </div>
+
+                    @if (model.DailyRate > 0 && Rental.PickupDate.HasValue && Rental.ReturnDueDate.HasValue)
+                    {
+                        var days = (Rental.ReturnDueDate.Value - Rental.PickupDate.Value).Days;
+                        var total = model.DailyRate * days;
+                        <div class="alert alert-info">
+                            <strong>Estimated Total:</strong> @total.ToString("N0") TND for @days day@(days != 1 ? "s" : "")
+                        </div>
+                    }
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="OnCancel">Cancel</button>
+                <button type="button" class="btn btn-success" @onclick="HandleConfirm" disabled="@(!IsValid)">
+                    <i class="fa fa-check"></i> Approve Rental
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CarRentalDto Rental { get; set; }
+    [Parameter] public EventCallback<ApproveRentalDto> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private ApproveRentalDto model = new();
+    private CarListingDto? carListing;
+
+    private bool IsValid => model.DailyRate > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load car listing to get default DailyRentalRate
+        try
+        {
+            carListing = await CarListingService.GetListingByIdAsync(Rental.CarId);
+            if (carListing?.DailyRentalRate.HasValue == true)
+            {
+                // Set default to car's DailyRentalRate
+                model.DailyRate = carListing.DailyRentalRate.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading car listing: {ex.Message}");
+        }
+    }
+
+    private async Task HandleConfirm()
+    {
+        if (IsValid)
+        {
+            await OnConfirm.InvokeAsync(model);
+        }
+    }
+}

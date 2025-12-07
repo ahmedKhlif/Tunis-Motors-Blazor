@@ -1,0 +1,422 @@
+@page "/rental/{id:int}"
+@attribute [Authorize]
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using BlazorApp.Components
+@using Microsoft.AspNetCore.Authorization
+@inject ICarRentalService RentalService
+@inject IAuthService AuthService
+@inject NavigationManager NavManager
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+
+<PageTitle>Rental Details - Tunisia Motors</PageTitle>
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Rental Details</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/my-rentals">My Rentals</a></li>
+                    <li class="active">Rental #@Id</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+        @if (errorMessage != null)
+        {
+            <div class="alert alert-danger">
+                <i class="fa fa-exclamation-circle"></i> @errorMessage
+            </div>
+        }
+
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <i class="fa fa-spinner fa-spin fa-3x"></i>
+                <p class="mt-3">Loading rental details...</p>
+            </div>
+        }
+        else if (rental != null)
+        {
+            <!-- Header -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <h2 class="section-title">Rental Details</h2>
+                    <p class="text-muted">Rental ID: #@rental.Id</p>
+                </div>
+                <div class="col-md-4 text-right">
+                    <span class="badge badge-@GetStatusBadgeClass(rental.Status) badge-lg">
+                        @rental.Status
+                    </span>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Car Information -->
+                <div class="col-md-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fa fa-car"></i> Vehicle Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <img src="@GetImageUrl(rental.CarImage)" alt="@rental.CarName" class="img-fluid rounded" />
+                                </div>
+                                <div class="col-md-8">
+                                    <h4>@rental.CarName</h4>
+                                    <hr />
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <p><strong>Daily Rate:</strong> $@rental.DailyRate?.ToString("N2")</p>
+                                            <p><strong>Pickup Date:</strong> @rental.PickupDate?.ToString("MMM dd, yyyy")</p>
+                                            <p><strong>Return Due:</strong> @rental.ReturnDueDate?.ToString("MMM dd, yyyy")</p>
+                                        </div>
+                                        <div class="col-6">
+                                            @if (rental.ReturnedAt.HasValue)
+                                            {
+                                                <p><strong>Returned On:</strong> @rental.ReturnedAt?.ToString("MMM dd, yyyy")</p>
+                                            }
+                                            @if (rental.IsOverdue)
+                                            {
+                                                <p class="text-danger"><strong>Overdue Days:</strong> @rental.OverdueDays</p>
+                                            }
+                                            else if (rental.RemainingDays > 0)
+                                            {
+                                                <p class="text-success"><strong>Days Remaining:</strong> @rental.RemainingDays</p>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rental Timeline -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fa fa-history"></i> Rental Timeline</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="timeline">
+                                <div class="timeline-item">
+                                    <div class="timeline-icon bg-primary">
+                                        <i class="fa fa-check"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <h6>Requested</h6>
+                                        <small>@rental.RequestedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                    </div>
+                                </div>
+
+                                @if (rental.ApprovedAt.HasValue)
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-icon bg-success">
+                                            <i class="fa fa-thumbs-up"></i>
+                                        </div>
+                                        <div class="timeline-content">
+                                            <h6>Approved</h6>
+                                            <small>@rental.ApprovedAt?.ToString("MMM dd, yyyy HH:mm")</small>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (rental.Status == RentalStatus.ACTIVE || rental.Status == RentalStatus.RETURNED || rental.Status == RentalStatus.OVERDUE)
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-icon bg-info">
+                                            <i class="fa fa-key"></i>
+                                        </div>
+                                        <div class="timeline-content">
+                                            <h6>Pickup</h6>
+                                            <small>@rental.PickupDate?.ToString("MMM dd, yyyy")</small>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (rental.ReturnedAt.HasValue)
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-icon bg-teal">
+                                            <i class="fa fa-flag-checkered"></i>
+                                        </div>
+                                        <div class="timeline-content">
+                                            <h6>Returned</h6>
+                                            <small>@rental.ReturnedAt?.ToString("MMM dd, yyyy HH:mm")</small>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    @if (!string.IsNullOrEmpty(rental.Notes))
+                    {
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5><i class="fa fa-sticky-note"></i> Notes</h5>
+                            </div>
+                            <div class="card-body">
+                                <p style="white-space: pre-wrap;">@rental.Notes</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Sidebar -->
+                <div class="col-md-4">
+                    <!-- Cost Summary -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fa fa-dollar"></i> Cost Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Rental Cost:</span>
+                                <strong>$@rental.TotalCost.ToString("N2")</strong>
+                            </div>
+                            @if (rental.LateFees.HasValue && rental.LateFees > 0)
+                            {
+                                <div class="d-flex justify-content-between mb-2 text-danger">
+                                    <span>Late Fees:</span>
+                                    <strong>$@rental.LateFees?.ToString("N2")</strong>
+                                </div>
+                                <hr />
+                                <div class="d-flex justify-content-between">
+                                    <span><strong>Total:</strong></span>
+                                    <strong class="text-primary">$@((rental.TotalCost + rental.LateFees.Value).ToString("N2"))</strong>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fa fa-cog"></i> Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            @if (rental.Status == RentalStatus.REQUESTED || rental.Status == RentalStatus.APPROVED)
+                            {
+                                @if (isCurrentUser)
+                                {
+                                    <button class="btn btn-danger btn-block" @onclick="CancelRental">
+                                        <i class="fa fa-times"></i> Cancel Rental
+                                    </button>
+                                }
+                            }
+                            
+                            <button class="btn btn-secondary btn-block" @onclick="NavigateBack">
+                                <i class="fa fa-arrow-left"></i> Back to List
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Contact Support -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fa fa-support"></i> Need Help?</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="small">If you have any questions about this rental, please contact our support team.</p>
+                            <button class="btn btn-primary btn-block btn-sm">
+                                <i class="fa fa-envelope"></i> Contact Support
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .badge-lg {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+    }
+
+    .timeline {
+        position: relative;
+        padding-left: 50px;
+    }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 30px;
+    }
+
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -33px;
+        top: 25px;
+        width: 2px;
+        height: 100%;
+        background: #e0e0e0;
+    }
+
+    .timeline-item:last-child::before {
+        display: none;
+    }
+
+    .timeline-icon {
+        position: absolute;
+        left: -45px;
+        top: 0;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+    }
+
+    .timeline-content h6 {
+        margin-bottom: 5px;
+        font-weight: 600;
+    }
+
+    .timeline-content small {
+        color: #666;
+    }
+</style>
+
+<!-- Notification Dialog -->
+<NotificationDialog @bind-Show="showNotification" 
+                  Title="@notificationTitle" 
+                  Message="@notificationMessage" 
+                  Type="@notificationType"
+                  OnClose="OnNotificationClose" />
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private CarRentalDto? rental;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private bool isCurrentUser = false;
+    private string? currentUserId;
+
+    // Notification dialog
+    private bool showNotification = false;
+    private string notificationTitle = "";
+    private string notificationMessage = "";
+    private NotificationType notificationType = NotificationType.Info;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = await AuthService.GetCurrentUserAsync();
+            currentUserId = user?.Id;
+
+            var response = await RentalService.GetRentalByIdAsync(Id);
+            if (response.Success && response.Data != null)
+            {
+                rental = response.Data;
+                isCurrentUser = rental.UserId == currentUserId;
+            }
+            else
+            {
+                errorMessage = response.Message ?? "Rental not found";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading rental: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStatusBadgeClass(RentalStatus status)
+    {
+        return status switch
+        {
+            RentalStatus.REQUESTED => "warning",
+            RentalStatus.APPROVED => "info",
+            RentalStatus.ACTIVE => "success",
+            RentalStatus.OVERDUE => "danger",
+            RentalStatus.RETURNED => "primary",
+            RentalStatus.CANCELLED => "secondary",
+            _ => "secondary"
+        };
+    }
+
+    private async Task CancelRental()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to cancel this rental?"))
+            return;
+
+        try
+        {
+            var response = await RentalService.CancelRentalAsync(rental!.Id, "Cancelled by user");
+            if (response.Success)
+            {
+                ShowNotification("Success", "Rental cancelled successfully", NotificationType.Success);
+                await Task.Delay(1500);
+                NavManager.NavigateTo("/my-rentals");
+            }
+            else
+            {
+                ShowNotification("Error", response.Message ?? "Failed to cancel rental", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error", $"Error cancelling rental: {ex.Message}", NotificationType.Error);
+        }
+    }
+
+    private void NavigateBack()
+    {
+        NavManager.NavigateTo(isCurrentUser ? "/my-rentals" : "/admin/rentals");
+    }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+            return "/images/noimage.jpg";
+
+        if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://"))
+            return imagePath;
+
+        var apiBaseUrl = Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5237";
+        if (imagePath.StartsWith("/"))
+            return $"{apiBaseUrl}{imagePath}";
+
+        return $"{apiBaseUrl}/images/{imagePath}";
+    }
+
+    private void ShowNotification(string title, string message, NotificationType type = NotificationType.Info)
+    {
+        notificationTitle = title;
+        notificationMessage = message;
+        notificationType = type;
+        showNotification = true;
+        StateHasChanged();
+    }
+
+    private void OnNotificationClose()
+    {
+        showNotification = false;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,77 @@
+@using BlazorApp.Models
+
+<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Return Rental Car</h5>
+                <button type="button" class="btn-close" @onclick="OnCancel"></button>
+            </div>
+            <div class="modal-body">
+                <div class="rental-summary mb-3">
+                    <h6>Rental Details:</h6>
+                    <p><strong>Car:</strong> @Rental.CarName</p>
+                    <p><strong>Customer:</strong> @Rental.UserName</p>
+                    <p><strong>Pickup:</strong> @Rental.FormattedPickupDate</p>
+                    <p><strong>Due Date:</strong> @Rental.FormattedReturnDueDate</p>
+                    @if (Rental.IsOverdue)
+                    {
+                        <p class="text-danger"><strong>Overdue:</strong> @Rental.OverdueDays day@(Rental.OverdueDays != 1 ? "s" : "")</p>
+                    }
+                </div>
+
+                <form>
+                    <div class="mb-3">
+                        <label for="returnMileage" class="form-label">Return Mileage</label>
+                        <input type="number" class="form-control" id="returnMileage"
+                               @bind="model.ReturnMileage" min="0">
+                        <div class="form-text">Current mileage reading on the car.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="damageNotes" class="form-label">Damage Notes (Optional)</label>
+                        <textarea class="form-control" id="damageNotes" rows="3"
+                                  @bind="model.DamageNotes" placeholder="Describe any damage or issues..."></textarea>
+                    </div>
+
+                    @if (Rental.IsOverdue)
+                    {
+                        <div class="mb-3">
+                            <label for="lateFees" class="form-label">Late Fees (TND)</label>
+                            <input type="number" class="form-control" id="lateFees"
+                                   @bind="model.LateFees" min="0" step="0.01">
+                            <div class="form-text">Additional charges for late return.</div>
+                        </div>
+                    }
+
+                    <div class="alert alert-info">
+                        <strong>Total Cost:</strong> @Rental.TotalCost.ToString("N0") TND
+                        @if (model.LateFees > 0)
+                        {
+                            <text>+ @model.LateFees.Value.ToString("N0") TND late fees</text>
+                        }
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="OnCancel">Cancel</button>
+                <button type="button" class="btn btn-success" @onclick="HandleConfirm">
+                    <i class="fa fa-undo"></i> Complete Return
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CarRentalDto Rental { get; set; }
+    [Parameter] public EventCallback<ReturnRentalDto> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private ReturnRentalDto model = new();
+
+    private async Task HandleConfirm()
+    {
+        await OnConfirm.InvokeAsync(model);
+    }
+}

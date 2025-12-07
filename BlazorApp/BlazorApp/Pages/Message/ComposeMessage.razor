@@ -1,0 +1,230 @@
+@page "/compose-message"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize]
+@inject IMessageService MessageService
+@inject IUserService UserService
+@inject NavigationManager NavManager
+
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fa fa-envelope me-2"></i>Contact Support Team</h4>
+                    <small>Choose who you want to contact from our support team</small>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="fa fa-check-circle me-2"></i>@successMessage
+                            <button type="button" class="btn-close" @onclick="@(() => successMessage = "")"></button>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="fa fa-exclamation-circle me-2"></i>@errorMessage
+                            <button type="button" class="btn-close" @onclick="@(() => errorMessage = "")"></button>
+                        </div>
+                    }
+
+                    <form @onsubmit="SendMessage">
+                        <div class="mb-3">
+                            <label class="form-label">To</label>
+                            @if (recipients != null && recipients.Any())
+                            {
+                                <select class="form-control" @bind="messageModel.ReceiverId" required>
+                                    <option value="">-- Select Recipient --</option>
+                                    @foreach (var recipient in recipients)
+                                    {
+                                        var roleIcon = recipient.Role == "Admin" ? "fa-crown" :
+                                                      recipient.Role == "Manager" ? "fa-user-tie" : "fa-user";
+                                        var roleColor = recipient.Role == "Admin" ? "text-danger" :
+                                                       recipient.Role == "Manager" ? "text-warning" : "text-info";
+                                        <option value="@recipient.Id">
+                                            @recipient.UserName (@recipient.Role)
+                                        </option>
+                                    }
+                                </select>
+                                <small class="form-text text-muted">
+                                    <i class="fa fa-info-circle me-1"></i>Choose who you want to contact: Admin, Manager, or Seller
+                                </small>
+                            }
+                            else if (isLoadingRecipients)
+                            {
+                                <div class="text-center py-3">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span>Loading recipients...</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control" @bind="messageModel.ReceiverId" readonly placeholder="Recipient ID" />
+                            }
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Subject</label>
+                            <input type="text" class="form-control" @bind="messageModel.Subject" placeholder="Enter message subject" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Recommended Subjects</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var subj in recommendedSubjects)
+                                {
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => SetSubject(subj)">@subj</button>
+                                }
+                            </div>
+                            <small class="form-text text-muted">
+                                <i class="fa fa-lightbulb me-1"></i>Click on a recommended subject to use it
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Message</label>
+                            <textarea class="form-control" @bind="messageModel.Content" rows="6" placeholder="Write your message here..." required></textarea>
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <button type="button" class="btn btn-outline-secondary" @onclick='() => NavManager.NavigateTo("/messages")'>
+                                        <i class="fa fa-arrow-left me-2"></i>Back to Messages
+                                    </button>
+                                    <button type="submit" class="btn btn-success btn-lg" disabled="@isSending">
+                                        @if (isSending)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            <span>Sending...</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="fa fa-paper-plane me-2"></i>
+                                            <span>Send Message</span>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? RecipientId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public int? ListingId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Subject { get; set; }
+
+    private CreateMessageDto messageModel = new();
+    private List<UserWithRoleDto>? recipients;
+    private List<string> recommendedSubjects = new() { "General Inquiry", "Technical Support", "Account Issue", "Billing Question", "Feature Request", "Bug Report", "Password Reset", "Other" };
+    private string successMessage = "";
+    private string errorMessage = "";
+    private bool isSending = false;
+    private bool isLoadingRecipients = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoadingRecipients = true;
+        
+        try
+        {
+            // Load recipients
+            recipients = await UserService.GetMessageRecipientsAsync();
+            
+            // Set recipient if provided
+            if (!string.IsNullOrEmpty(RecipientId))
+            {
+                messageModel.ReceiverId = RecipientId;
+            }
+            
+            // Set listing if provided
+            if (ListingId.HasValue && ListingId.Value > 0)
+            {
+                messageModel.ListingId = ListingId;
+            }
+            
+            // Set subject if provided
+            if (!string.IsNullOrEmpty(Subject))
+            {
+                messageModel.Subject = Subject;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading recipients: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingRecipients = false;
+        }
+    }
+
+    private void SetSubject(string subject)
+    {
+        messageModel.Subject = subject;
+    }
+
+    private async Task SendMessage()
+    {
+        isSending = true;
+        errorMessage = "";
+        successMessage = "";
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(messageModel.ReceiverId))
+            {
+                errorMessage = "Please select a recipient";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(messageModel.Subject))
+            {
+                errorMessage = "Please enter a subject";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(messageModel.Content))
+            {
+                errorMessage = "Please enter a message";
+                return;
+            }
+
+            var result = await MessageService.SendMessageAsync(messageModel);
+            
+            if (result)
+            {
+                successMessage = "Message sent successfully!";
+                await Task.Delay(1500);
+                NavManager.NavigateTo("/messages");
+            }
+            else
+            {
+                errorMessage = "Failed to send message. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSending = false;
+        }
+    }
+}

@@ -1,0 +1,233 @@
+@page "/admin/delete-category/{id:int}"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject ICategoryService CategoryService
+@inject NavigationManager NavigationManager
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="fa fa-trash-alt me-2"></i>Delete Category</h4>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @errorMessage
+                            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                        </div>
+                    }
+
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading category...</p>
+                        </div>
+                    }
+                    else if (category != null)
+                    {
+                        <div class="alert alert-warning">
+                            <i class="fa fa-exclamation-triangle me-2"></i>
+                            <strong>Warning:</strong> This action cannot be undone. Deleting this category will permanently remove it from the system.
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 text-center mb-3">
+                                @if (!string.IsNullOrEmpty(category.Image))
+                                {
+                                    <img src="/images/categories/@category.Image" alt="@category.CategoryName" class="img-fluid rounded" />
+                                }
+                                else
+                                {
+                                    <div class="bg-light d-flex align-items-center justify-content-center rounded" style="height: 150px;">
+                                        <i class="fa fa-image fa-3x text-muted"></i>
+                                    </div>
+                                }
+                            </div>
+                            <div class="col-md-8">
+                                <dl class="row">
+                                    <dt class="col-sm-4">Category Name:</dt>
+                                    <dd class="col-sm-8">@category.CategoryName</dd>
+
+                                    <dt class="col-sm-4">Description:</dt>
+                                    <dd class="col-sm-8">@(string.IsNullOrEmpty(category.Description) ? "No description" : category.Description)</dd>
+
+                                    <dt class="col-sm-4">Listings Count:</dt>
+                                    <dd class="col-sm-8">
+                                        <span class="badge bg-info">@listingsCount listings</span>
+                                        @if (listingsCount > 0)
+                                        {
+                                            <small class="text-muted d-block">Warning: Deleting this category will affect @listingsCount car listings!</small>
+                                        }
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+
+                        <hr />
+
+                        <div class="d-flex justify-content-between">
+                            <a href="/admin/categories" class="btn btn-outline-secondary">
+                                <i class="fa fa-arrow-left me-2"></i>Cancel
+                            </a>
+
+                            <button class="btn btn-danger" @onclick="ConfirmDelete" disabled="@isDeleting">
+                                @if (isDeleting)
+                                {
+                                    <text><span class="spinner-border spinner-border-sm me-2" role="status"></span>Deleting...</text>
+                                }
+                                else
+                                {
+                                    <text><i class="fa fa-trash-alt me-2"></i>Delete Category</text>
+                                }
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <i class="fa fa-exclamation-triangle me-2"></i>Category not found.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Delete Dialog -->
+<ConfirmDialog IsVisible="@showDeleteDialog"
+               Title="Delete Category"
+               Message="@deleteDialogMessage"
+               ConfirmText="Delete"
+               CancelText="Cancel"
+               Type="ConfirmDialog.DialogType.Danger"
+               OnConfirm="@OnDeleteConfirmed"
+               OnCancel="@OnDeleteCancelled" />
+
+<!-- Alert Dialog -->
+<AlertDialog IsVisible="@showAlert"
+             Title="@alertTitle"
+             Message="@alertMessage"
+             Type="@alertType"
+             OnClose="@CloseAlert" />
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private CategoryDto category;
+    private int listingsCount = 0;
+    private bool isLoading = true;
+    private bool isDeleting = false;
+    private string errorMessage = "";
+    private bool showDeleteDialog = false;
+    private string deleteDialogMessage = "";
+    private bool showAlert = false;
+    private string alertTitle = "";
+    private string alertMessage = "";
+    private AlertDialog.AlertType alertType = AlertDialog.AlertType.Info;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategory();
+    }
+
+    private async Task LoadCategory()
+    {
+        try
+        {
+            isLoading = true;
+            category = await CategoryService.GetCategoryByIdAsync(Id);
+
+            if (category != null)
+            {
+                // Get listings count for this category
+                var listings = await CategoryService.GetCategoryListingsAsync(Id);
+                listingsCount = listings?.Count ?? 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load category.";
+            Console.WriteLine($"Load category error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ConfirmDelete()
+    {
+        deleteDialogMessage = listingsCount > 0
+            ? $"Are you sure you want to delete the category '{category.CategoryName}'? This will affect {listingsCount} car listings and cannot be undone!"
+            : $"Are you sure you want to delete the category '{category.CategoryName}'? This action cannot be undone.";
+        showDeleteDialog = true;
+    }
+
+    private async Task OnDeleteConfirmed()
+    {
+        await DeleteCategory();
+    }
+
+    private void OnDeleteCancelled()
+    {
+        showDeleteDialog = false;
+    }
+
+    private async Task DeleteCategory()
+    {
+        isDeleting = true;
+        errorMessage = "";
+
+        try
+        {
+            var result = await CategoryService.DeleteCategoryAsync(Id);
+            if (result)
+            {
+                alertTitle = "Success";
+                alertMessage = "Category deleted successfully!";
+                alertType = AlertDialog.AlertType.Success;
+                showAlert = true;
+                await Task.Delay(1500);
+                NavigationManager.NavigateTo("/admin/categories");
+            }
+            else
+            {
+                errorMessage = "Failed to delete category.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Delete category error: {ex.Message}");
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private void ShowAlert(string title, string message, AlertDialog.AlertType type)
+    {
+        alertTitle = title;
+        alertMessage = message;
+        alertType = type;
+        showAlert = true;
+    }
+
+    private void CloseAlert()
+    {
+        showAlert = false;
+    }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; }
+}

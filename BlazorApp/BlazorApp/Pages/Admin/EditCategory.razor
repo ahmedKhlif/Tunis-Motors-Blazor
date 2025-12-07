@@ -1,0 +1,321 @@
+@page "/admin/edit-category/{id:int}"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using System.ComponentModel.DataAnnotations
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject ICategoryService CategoryService
+@inject NavigationManager NavigationManager
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fa fa-edit me-2"></i>Edit Category</h4>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            @successMessage
+                            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @errorMessage
+                            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                        </div>
+                    }
+
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading category...</p>
+                        </div>
+                    }
+                    else if (category != null)
+                    {
+                        <EditForm Model="editModel" OnValidSubmit="HandleUpdateCategory" FormName="editCategoryForm" enctype="multipart/form-data">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger" />
+
+                            <div class="mb-3">
+                                <label for="categoryName" class="form-label">Category Name</label>
+                                <InputText id="categoryName" class="form-control" @bind-Value="editModel.CategoryName" placeholder="Enter category name" />
+                                <ValidationMessage For="() => editModel.CategoryName" class="text-danger" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description (Optional)</label>
+                                <InputTextArea id="description" class="form-control" rows="3" @bind-Value="editModel.Description" placeholder="Enter category description" />
+                                <ValidationMessage For="() => editModel.Description" class="text-danger" />
+                            </div>
+
+                            <!-- Current Image Display -->
+                            @if (!string.IsNullOrEmpty(category.Image))
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label">Current Image</label>
+                                    <div class="border rounded p-2">
+                                        <img src="@category.Image" alt="Current category image" class="img-fluid" style="max-height: 150px;" onerror="this.src='/images/placeholder.png';" />
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="mb-3">
+                                <label class="form-label">Update Image (Optional)</label>
+                                <div class="border rounded p-3 text-center bg-light" style="border-style: dashed !important; min-height: 120px;"
+                                     @ondragover:preventDefault="true"
+                                     @ondrop:preventDefault="true">
+                                    <InputFile id="imageFile" OnChange="HandleFileSelected" accept="image/*" style="display: none;" />
+                                    <label for="imageFile" class="d-block mb-0" style="cursor: pointer;">
+                                        @if (!string.IsNullOrEmpty(imagePreview))
+                                        {
+                                            <div class="mb-2">
+                                                <img src="@imagePreview" alt="Preview" class="img-thumbnail" style="max-height: 100px; max-width: 200px;" />
+                                            </div>
+                                            <p class="mb-1"><strong>@selectedFileName</strong></p>
+                                            <button type="button" class="btn btn-sm btn-warning" @onclick="ClearImage" @onclick:stopPropagation="true">
+                                                <i class="fa fa-times"></i> Change Image
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <i class="fa fa-cloud-upload fa-2x text-primary mb-2"></i>
+                                            <p class="mb-1"><strong>Click or drag image here</strong></p>
+                                            <p class="text-muted small mb-0">Supported: JPG, PNG, GIF. Max 5MB</p>
+                                        }
+                                    </label>
+                                </div>
+                                @if (!string.IsNullOrEmpty(imageError))
+                                {
+                                    <div class="alert alert-danger mt-2 mb-0">@imageError</div>
+                                }
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                                    @if (isSubmitting)
+                                    {
+                                        <text><span class="spinner-border spinner-border-sm me-2" role="status"></span>Updating...</text>
+                                    }
+                                    else
+                                    {
+                                        <text><i class="fa fa-save me-2"></i>Update Category</text>
+                                    }
+                                </button>
+                                <div class="d-flex gap-2">
+                                    <a href="/admin/categories" class="btn btn-outline-secondary flex-fill">
+                                        <i class="fa fa-arrow-left me-2"></i>Back to Categories
+                                    </a>
+                                    <a href="/category/@category.CategoryId" class="btn btn-outline-info">
+                                        <i class="fa fa-eye me-2"></i>View Category
+                                    </a>
+                                </div>
+                            </div>
+                        </EditForm>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <i class="fa fa-exclamation-triangle me-2"></i>Category not found.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private CategoryDto category;
+    private EditCategoryModel editModel = new();
+    private IBrowserFile selectedFile;
+    private string selectedFileName = "";
+    private string imagePreview = "";
+    private string imageError = "";
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string successMessage = "";
+    private string errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine($"[EDIT-CATEGORY] Initializing with ID: {Id}");
+        await LoadCategory();
+    }
+
+    private async Task LoadCategory()
+    {
+        try
+        {
+            isLoading = true;
+            Console.WriteLine($"[EDIT-CATEGORY] Loading category ID: {Id}");
+            category = await CategoryService.GetCategoryByIdAsync(Id);
+
+            if (category != null)
+            {
+                editModel.CategoryName = category.CategoryName;
+                editModel.Description = category.Description;
+                imagePreview = "";
+                selectedFileName = "";
+                Console.WriteLine($"[EDIT-CATEGORY] Category loaded: {category.CategoryName}");
+            }
+            else
+            {
+                errorMessage = $"Category with ID {Id} not found.";
+                Console.WriteLine($"[EDIT-CATEGORY] Category not found for ID: {Id}");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load category.";
+            Console.WriteLine($"[EDIT-CATEGORY] Load error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            imageError = "";
+            selectedFile = e.File;
+            selectedFileName = selectedFile?.Name ?? "";
+            
+            Console.WriteLine($"[EDIT-CATEGORY] File selected: {selectedFileName}, Size: {selectedFile?.Size}");
+
+            if (selectedFile != null)
+            {
+                // Validate file size (5MB max)
+                const long maxFileSize = 5 * 1024 * 1024; // 5MB
+                if (selectedFile.Size > maxFileSize)
+                {
+                    imageError = "File size exceeds 5MB limit.";
+                    selectedFile = null;
+                    selectedFileName = "";
+                    imagePreview = "";
+                    Console.WriteLine($"[EDIT-CATEGORY] File rejected: exceeds size limit");
+                    return;
+                }
+
+                // Generate preview (first 50KB for quick feedback)
+                try
+                {
+                    using (var stream = selectedFile.OpenReadStream(maxFileSize))
+                    {
+                        var bytes = new byte[Math.Min((int)stream.Length, 50 * 1024)];
+                        await stream.ReadAsync(bytes);
+                        imagePreview = $"data:image/jpg;base64,{Convert.ToBase64String(bytes)}";
+                        Console.WriteLine($"[EDIT-CATEGORY] Image preview generated");
+                    }
+                }
+                catch (Exception previewEx)
+                {
+                    Console.WriteLine($"[EDIT-CATEGORY] Preview generation error: {previewEx.Message}");
+                    imagePreview = ""; // Preview failed, but allow upload
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            imageError = $"Error processing file: {ex.Message}";
+            Console.WriteLine($"[EDIT-CATEGORY] File selection error: {ex.Message}");
+        }
+    }
+
+    private void ClearImage()
+    {
+        selectedFile = null;
+        selectedFileName = "";
+        imagePreview = "";
+        imageError = "";
+        Console.WriteLine($"[EDIT-CATEGORY] Image cleared");
+    }
+
+    private async Task HandleUpdateCategory()
+    {
+        isSubmitting = true;
+        errorMessage = "";
+        successMessage = "";
+
+        try
+        {
+            Console.WriteLine($"[EDIT-CATEGORY] Starting update for category ID: {Id}");
+            
+            string imagePath = null;
+
+            // Upload image if a new file was selected
+            if (selectedFile != null)
+            {
+                Console.WriteLine($"[EDIT-CATEGORY] Uploading new image: {selectedFile.Name}");
+                imagePath = await CategoryService.UploadCategoryImageAsync(selectedFile);
+                
+                if (string.IsNullOrEmpty(imagePath))
+                {
+                    errorMessage = "Failed to upload image. Please try again.";
+                    Console.WriteLine($"[EDIT-CATEGORY] Image upload failed");
+                    isSubmitting = false;
+                    return;
+                }
+                Console.WriteLine($"[EDIT-CATEGORY] Image uploaded successfully: {imagePath}");
+            }
+
+            var updateDto = new UpdateCategoryDto
+            {
+                CategoryName = editModel.CategoryName,
+                Description = editModel.Description,
+                Image = imagePath // Use new path if uploaded, otherwise backend keeps existing
+            };
+
+            var result = await CategoryService.UpdateCategoryAsync(Id, updateDto);
+            
+            if (result != null)
+            {
+                successMessage = $"Category '{editModel.CategoryName}' updated successfully!";
+                Console.WriteLine($"[EDIT-CATEGORY] Update successful");
+                selectedFile = null;
+                selectedFileName = "";
+                imagePreview = "";
+                await LoadCategory(); // Refresh data
+            }
+            else
+            {
+                errorMessage = "Failed to update category.";
+                Console.WriteLine($"[EDIT-CATEGORY] Update failed - no result");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"[EDIT-CATEGORY] Update error: {ex.Message}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    public class EditCategoryModel
+    {
+        [Required(ErrorMessage = "Category name is required")]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Category name must be between 2 and 100 characters")]
+        public string CategoryName { get; set; } = "";
+
+        [StringLength(1000, ErrorMessage = "Description cannot exceed 1000 characters")]
+        public string Description { get; set; } = "";
+    }
+}

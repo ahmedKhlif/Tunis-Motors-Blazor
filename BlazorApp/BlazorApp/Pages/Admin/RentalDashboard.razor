@@ -1,0 +1,620 @@
+@page "/admin/rentals"
+@attribute [Authorize(Roles = "Admin,Manager")]
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using BlazorApp.Components
+@using Microsoft.AspNetCore.Authorization
+@inject ICarRentalService RentalService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavManager
+
+<PageTitle>Rental Management - Tunisia Motors</PageTitle>
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Rental Management</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/admin">Dashboard</a></li>
+                    <li class="active">Rental Management</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="section-title">Car Rental Management</h2>
+                <p class="section-subtitle">Manage rental requests, track active rentals, and monitor overdue returns</p>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        @if (statistics != null)
+        {
+            <div class="row mb-4">
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-warning border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Requests</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.PendingRequests</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-clock"></i> Awaiting Approval
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-clock-o fa-3x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-primary border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Active Rentals</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.ActiveRentals</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-car"></i> Currently Active
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-car fa-3x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-danger border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Overdue Rentals</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.OverdueRentals</h3>
+                                    <small class="text-muted">
+                                        @if (statistics.OverdueRentals > 0)
+                                        {
+                                            <span class="text-danger"><i class="fa fa-exclamation-triangle"></i> Needs Action</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-success"><i class="fa fa-check"></i> All On Time</span>
+                                        }
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-exclamation-triangle fa-3x text-danger opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-success border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Monthly Revenue</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.MonthlyRevenue.ToString("N0") TND</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-chart-line"></i> This Month
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-dollar fa-3x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Rental Metrics Row -->
+            <div class="row mb-4">
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-info border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Total Rentals</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.TotalRentals</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-calendar-check"></i> All Time
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-calendar-check fa-3x text-info opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-secondary border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">Returned This Month</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.ReturnedThisMonth</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-undo"></i> @statistics.ReturnedThisWeek completed this week
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-undo fa-3x text-secondary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-primary border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Avg Rental Duration</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.AverageRentalDuration.ToString("F1") days</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-clock-o"></i> Average per rental
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-clock-o fa-3x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="card shadow h-100 border-start border-success border-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Revenue</div>
+                                    <h3 class="mb-0 font-weight-bold text-gray-800">@statistics.TotalRevenue.ToString("N0") TND</h3>
+                                    <small class="text-muted">
+                                        <i class="fa fa-money"></i> All Time Earnings
+                                    </small>
+                                </div>
+                                <div>
+                                    <i class="fa fa-money fa-3x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Tabbed Interface -->
+        <div class="row">
+            <div class="col-12">
+                <div class="rental-tabs">
+                    <ul class="nav nav-tabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link @(activeTab == "calendar" ? "active" : "")"
+                               @onclick="@(async () => await SetActiveTab("calendar"))"
+                               role="button">
+                                <i class="fa fa-calendar"></i> Calendar View
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @(activeTab == "pending" ? "active" : "")"
+                               @onclick="@(async () => await SetActiveTab("pending"))"
+                               role="tab">
+                                <i class="fa fa-clock-o"></i> Pending Requests (@(statistics?.PendingRequests ?? 0))
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @(activeTab == "active" ? "active" : "")"
+                               @onclick="@(async () => await SetActiveTab("active"))"
+                               role="tab">
+                                <i class="fa fa-car"></i> Active Rentals (@(statistics?.ActiveRentals ?? 0))
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @(activeTab == "history" ? "active" : "")"
+                               @onclick="@(async () => await SetActiveTab("history"))"
+                               role="button">
+                                <i class="fa fa-history"></i> Rental History
+                            </a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        @if (activeTab == "calendar")
+                        {
+                            <div class="tab-pane active">
+                                <div id="calendar-container" style="height: 600px;">
+                                    <!-- Calendar will be rendered here -->
+                                </div>
+                            </div>
+                        }
+                        else if (activeTab == "pending")
+                        {
+                            <PendingRequestsTab Rentals="pendingRentals"
+                                              OnApprove="HandleApproveRental"
+                                              OnReject="HandleRejectRental"
+                                              IsLoading="isLoading" />
+                        }
+                        else if (activeTab == "active")
+                        {
+                            <ActiveRentalsTab Rentals="activeRentals"
+                                            OnReturn="HandleReturnRental"
+                                            OnExtend="HandleExtendRental"
+                                            IsLoading="isLoading" />
+                        }
+                        else if (activeTab == "history")
+                        {
+                            <RentalHistoryTab Rentals="rentalHistory"
+                                            IsLoading="isLoading" />
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /SECTION -->
+
+<!-- Notification Dialog -->
+<NotificationDialog @bind-Show="showNotification" 
+                  Title="@notificationTitle" 
+                  Message="@notificationMessage" 
+                  Type="@notificationType"
+                  OnClose="OnNotificationClose" />
+
+<!-- Action Modals -->
+@if (selectedRental != null)
+{
+    @if (actionType == "approve")
+    {
+        <ApproveRentalModal Rental="selectedRental"
+                          OnConfirm="ConfirmApproveRental"
+                          OnCancel="CancelAction" />
+    }
+    else if (actionType == "reject")
+    {
+        <RejectRentalModal Rental="selectedRental"
+                         OnConfirm="ConfirmRejectRental"
+                         OnCancel="CancelAction" />
+    }
+    else if (actionType == "return")
+    {
+        <ReturnRentalModal Rental="selectedRental"
+                         OnConfirm="ConfirmReturnRental"
+                         OnCancel="CancelAction" />
+    }
+    else if (actionType == "extend")
+    {
+        <ExtendRentalModal Rental="selectedRental"
+                         OnConfirm="ConfirmExtendRental"
+                         OnCancel="CancelAction" />
+    }
+}
+
+@code {
+    private RentalStatisticsDto statistics;
+    private List<CarRentalDto> pendingRentals = new();
+    private List<CarRentalDto> activeRentals = new();
+    private List<CarRentalDto> rentalHistory = new();
+    private List<CalendarEventDto> calendarEvents = new();
+    private string activeTab = "calendar";
+    private bool isLoading = true;
+    private CarRentalDto selectedRental;
+    private string actionType;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatisticsAsync();
+        await LoadRentalsAsync();
+        await LoadCalendarEventsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && activeTab == "calendar")
+        {
+            await InitializeCalendarAsync();
+        }
+    }
+
+    private async Task LoadStatisticsAsync()
+    {
+        try
+        {
+            var response = await RentalService.GetRentalStatisticsAsync();
+            if (response.Success)
+            {
+                statistics = response.Data;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading statistics: {ex.Message}");
+        }
+    }
+
+    private async Task LoadRentalsAsync()
+    {
+        isLoading = true;
+
+        try
+        {
+            // Load pending rentals
+            var pendingResponse = await RentalService.GetAllRentalsAsync(new CarRentalFilterDto
+            {
+                Status = RentalStatus.REQUESTED,
+                PageSize = 50
+            });
+            if (pendingResponse.Success)
+                pendingRentals = pendingResponse.Data.Data;
+
+            // Load active rentals
+            var activeResponse = await RentalService.GetAllRentalsAsync(new CarRentalFilterDto
+            {
+                Status = RentalStatus.ACTIVE,
+                PageSize = 50
+            });
+            if (activeResponse.Success)
+                activeRentals = activeResponse.Data.Data;
+
+            // Load rental history
+            var historyResponse = await RentalService.GetAllRentalsAsync(new CarRentalFilterDto
+            {
+                Status = RentalStatus.RETURNED,
+                PageSize = 50
+            });
+            if (historyResponse.Success)
+                rentalHistory = historyResponse.Data.Data;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading rentals: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCalendarEventsAsync()
+    {
+        try
+        {
+            var start = DateTime.Now.AddMonths(-1);
+            var end = DateTime.Now.AddMonths(2);
+
+            var response = await RentalService.GetAdminCalendarEventsAsync(start, end);
+            if (response.Success)
+            {
+                calendarEvents = response.Data;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading calendar events: {ex.Message}");
+        }
+    }
+
+    private async Task InitializeCalendarAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("initializeRentalCalendar", calendarEvents);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing calendar: {ex.Message}");
+        }
+    }
+
+    private async Task SetActiveTab(string tab)
+    {
+        activeTab = tab;
+        StateHasChanged();
+        
+        if (tab == "calendar")
+        {
+            await Task.Delay(100);
+            await InitializeCalendarAsync();
+        }
+    }
+
+    private void HandleApproveRental(CarRentalDto rental)
+    {
+        selectedRental = rental;
+        actionType = "approve";
+        StateHasChanged();
+    }
+
+    private void HandleRejectRental(CarRentalDto rental)
+    {
+        selectedRental = rental;
+        actionType = "reject";
+        StateHasChanged();
+    }
+
+    private void HandleReturnRental(CarRentalDto rental)
+    {
+        selectedRental = rental;
+        actionType = "return";
+        StateHasChanged();
+    }
+
+    private void HandleExtendRental(CarRentalDto rental)
+    {
+        selectedRental = rental;
+        actionType = "extend";
+        StateHasChanged();
+    }
+
+    private async Task ConfirmApproveRental(ApproveRentalDto model)
+    {
+        try
+        {
+            var response = await RentalService.ApproveRentalAsync(selectedRental.Id, model);
+            if (response.Success)
+            {
+                await ShowSuccessMessage("Rental approved successfully");
+                await RefreshDataAsync();
+            }
+            else
+            {
+                await ShowErrorMessage(response.Message ?? "Failed to approve rental");
+            }
+        }
+        catch (Exception ex)
+        {
+            await ShowErrorMessage($"Error approving rental: {ex.Message}");
+        }
+        finally
+        {
+            CancelAction();
+        }
+    }
+
+    private async Task ConfirmRejectRental(string reason)
+    {
+        try
+        {
+            var response = await RentalService.RejectRentalAsync(selectedRental.Id, reason);
+            if (response.Success)
+            {
+                await ShowSuccessMessage("Rental rejected successfully");
+                await RefreshDataAsync();
+            }
+            else
+            {
+                await ShowErrorMessage(response.Message ?? "Failed to reject rental");
+            }
+        }
+        catch (Exception ex)
+        {
+            await ShowErrorMessage($"Error rejecting rental: {ex.Message}");
+        }
+        finally
+        {
+            CancelAction();
+        }
+    }
+
+    private async Task ConfirmReturnRental(ReturnRentalDto model)
+    {
+        try
+        {
+            var response = await RentalService.ReturnRentalAsync(selectedRental.Id, model);
+            if (response.Success)
+            {
+                await ShowSuccessMessage("Rental returned successfully");
+                await RefreshDataAsync();
+            }
+            else
+            {
+                await ShowErrorMessage(response.Message ?? "Failed to return rental");
+            }
+        }
+        catch (Exception ex)
+        {
+            await ShowErrorMessage($"Error returning rental: {ex.Message}");
+        }
+        finally
+        {
+            CancelAction();
+        }
+    }
+
+    private async Task ConfirmExtendRental(ExtendRentalDto model)
+    {
+        try
+        {
+            var response = await RentalService.ExtendRentalAsync(selectedRental.Id, model);
+            if (response.Success)
+            {
+                await ShowSuccessMessage($"Rental extended by {model.AdditionalDays} days successfully");
+                await RefreshDataAsync();
+            }
+            else
+            {
+                await ShowErrorMessage(response.Message ?? "Failed to extend rental");
+            }
+        }
+        catch (Exception ex)
+        {
+            await ShowErrorMessage($"Error extending rental: {ex.Message}");
+        }
+        finally
+        {
+            CancelAction();
+        }
+    }
+
+    private void CancelAction()
+    {
+        selectedRental = null;
+        actionType = null;
+        StateHasChanged();
+    }
+
+    private async Task RefreshDataAsync()
+    {
+        await LoadStatisticsAsync();
+        await LoadRentalsAsync();
+        await LoadCalendarEventsAsync();
+
+        if (activeTab == "calendar")
+        {
+            await InitializeCalendarAsync();
+        }
+    }
+
+    // Notification dialog
+    private bool showNotification = false;
+    private string notificationTitle = "";
+    private string notificationMessage = "";
+    private NotificationType notificationType = NotificationType.Info;
+    
+    private void ShowNotification(string title, string message, NotificationType type = NotificationType.Info)
+    {
+        notificationTitle = title;
+        notificationMessage = message;
+        notificationType = type;
+        showNotification = true;
+        StateHasChanged();
+    }
+    
+    private void OnNotificationClose()
+    {
+        showNotification = false;
+        StateHasChanged();
+    }
+    
+    private Task ShowSuccessMessage(string message)
+    {
+        ShowNotification("Success", message, NotificationType.Success);
+        return Task.CompletedTask;
+    }
+
+    private Task ShowErrorMessage(string message)
+    {
+        ShowNotification("Error", message, NotificationType.Error);
+        return Task.CompletedTask;
+    }
+}

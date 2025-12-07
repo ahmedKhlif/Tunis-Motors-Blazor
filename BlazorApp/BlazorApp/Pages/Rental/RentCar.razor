@@ -1,0 +1,302 @@
+@page "/rent-car/{carId:int}"
+@page "/rent/{carId:int}"
+@attribute [Authorize]
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using BlazorApp.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@inject ICarListingService CarListingService
+@inject ICarRentalService CarRentalService
+@inject NavigationManager NavManager
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Rent Car</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/rentals">Rent a Car</a></li>
+                    <li class="active">Rental Request</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="fa fa-calendar me-2"></i>Rent Car</h3>
+                </div>
+                <div class="card-body p-4">
+
+                    @if (car == null)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading car details...</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Car Summary -->
+                        <div class="car-summary mb-4 p-3 bg-light rounded">
+                            <div class="row align-items-center">
+                                <div class="col-md-3">
+                                    <img src="@GetImageUrl(car.Image)" class="img-fluid rounded" alt="@car.Name" style="max-height: 120px;">
+                                </div>
+                                <div class="col-md-6">
+                                    <h4 class="mb-1">@car.Name (@car.Year)</h4>
+                                    <p class="mb-1 text-muted">@car.Brand • @car.Condition</p>
+                                    <div class="d-flex align-items-center">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            if (i <= car.Rating)
+                                            {
+                                                <i class="fa fa-star text-warning"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="fa fa-star-o text-warning"></i>
+                                            }
+                                        }
+                                        <small class="text-muted ms-2">(@car.Rating.ToString("F1"))</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 text-end">
+                                    <div class="h5 text-primary mb-0">@car.DailyRentalRate?.ToString("N0") TND/day</div>
+                                    <small class="text-muted">Daily Rate</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rental Form -->
+                        <form @onsubmit="SubmitRentalRequest">
+                            <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="startDate" class="form-label fw-bold">Pickup Date</label>
+                                            <input type="date" id="startDate" class="form-control form-control-lg"
+                                                   @bind="rentalRequest.PickupDate" @bind:after="CalculateTotal"
+                                                   min="@DateTime.Today.ToString("yyyy-MM-dd")" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="endDate" class="form-label fw-bold">Return Date</label>
+                                            <input type="date" id="endDate" class="form-control form-control-lg"
+                                                   @bind="rentalRequest.ReturnDueDate" @bind:after="CalculateTotal"
+                                                   min="@(rentalRequest.PickupDate.ToString("yyyy-MM-dd"))" required>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            <!-- Rental Summary -->
+                            @if (rentalDays > 0)
+                            {
+                                <div class="rental-summary p-3 bg-light rounded mb-4">
+                                    <h5 class="mb-3">Rental Summary</h5>
+                                    <div class="row">
+                                        <div class="col-sm-6">
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span>Daily Rate:</span>
+                                                <strong>@car.DailyRentalRate?.ToString("N0") TND</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span>Rental Days:</span>
+                                                <strong>@rentalDays</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span>Subtotal:</span>
+                                                <strong>@subtotal.ToString("N0") TND</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <span class="text-success">Total:</span>
+                                                <strong class="text-success h5 mb-0">@total.ToString("N0") TND</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- Terms and Conditions -->
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="termsCheck" @bind="acceptTerms" required>
+                                    <label class="form-check-label" for="termsCheck">
+                                        I agree to the <a href="#" class="text-decoration-none">rental terms and conditions</a>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="d-flex gap-3 justify-content-end">
+                                <button type="button" class="btn btn-outline-secondary px-4" @onclick="Cancel">
+                                    <i class="fa fa-times me-2"></i>Cancel
+                                </button>
+                                <button type="submit" class="btn btn-primary px-4" disabled="@(!acceptTerms || rentalDays <= 0)">
+                                    <i class="fa fa-paper-plane me-2"></i>Submit Rental Request
+                                </button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+<!-- /SECTION -->
+
+<!-- Notification Dialog -->
+<NotificationDialog @bind-Show="showNotification" 
+                  Title="@notificationTitle" 
+                  Message="@notificationMessage" 
+                  Type="@notificationType"
+                  OnClose="OnNotificationClose" />
+
+@code {
+    [Parameter]
+    public int carId { get; set; }
+
+    private CarListingDto car;
+    private CreateCarRentalDto rentalRequest = new();
+    private bool acceptTerms = false;
+    private int rentalDays = 0;
+    private decimal subtotal = 0;
+    private decimal total = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            car = await CarListingService.GetListingByIdAsync(carId);
+
+            if (car == null || !car.IsAvailableForRental || car.RentalStock <= 0)
+            {
+                NavManager.NavigateTo("/rentals");
+                return;
+            }
+
+            // Set default dates
+            rentalRequest.PickupDate = DateTime.Today.AddDays(1);
+            rentalRequest.ReturnDueDate = DateTime.Today.AddDays(2);
+            rentalRequest.CarId = carId;
+
+            CalculateTotal();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading car: {ex.Message}");
+            NavManager.NavigateTo("/rentals");
+        }
+    }
+
+    private void CalculateTotal()
+    {
+        if (rentalRequest.PickupDate != default && rentalRequest.ReturnDueDate != default && car?.DailyRentalRate.HasValue == true)
+        {
+            rentalDays = (rentalRequest.ReturnDueDate - rentalRequest.PickupDate).Days;
+            if (rentalDays > 0)
+            {
+                subtotal = rentalDays * car.DailyRentalRate.Value;
+                total = subtotal; // Add taxes/fees here if needed
+            }
+            else
+            {
+                rentalDays = 0;
+                subtotal = 0;
+                total = 0;
+            }
+        }
+        else
+        {
+            rentalDays = 0;
+            subtotal = 0;
+            total = 0;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SubmitRentalRequest()
+    {
+        try
+        {
+            var result = await CarRentalService.CreateRentalRequestAsync(rentalRequest);
+
+            if (result.Success)
+            {
+                ShowNotification("Success", "Rental request submitted successfully! You will receive a confirmation email once approved.", NotificationType.Success);
+                await Task.Delay(2000);
+                NavManager.NavigateTo("/my-rentals");
+            }
+            else
+            {
+                ShowNotification("Error", result.Message ?? "Failed to submit rental request. Please try again.", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error submitting rental request: {ex.Message}");
+            ShowNotification("Error", "An error occurred while submitting your rental request. Please try again.", NotificationType.Error);
+        }
+    }
+
+    private void Cancel()
+    {
+        NavManager.NavigateTo($"/product/{carId}");
+    }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+            return "/images/noimage.jpg";
+
+        if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://"))
+            return imagePath;
+
+        var apiBaseUrl = Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5237";
+        if (imagePath.StartsWith("/"))
+            return $"{apiBaseUrl}{imagePath}";
+
+        return $"{apiBaseUrl}/images/{imagePath}";
+    }
+    
+    // Notification dialog
+    private bool showNotification = false;
+    private string notificationTitle = "";
+    private string notificationMessage = "";
+    private NotificationType notificationType = NotificationType.Info;
+    
+    private void ShowNotification(string title, string message, NotificationType type = NotificationType.Info)
+    {
+        notificationTitle = title;
+        notificationMessage = message;
+        notificationType = type;
+        showNotification = true;
+        StateHasChanged();
+    }
+    
+    private void OnNotificationClose()
+    {
+        showNotification = false;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,501 @@
+@page "/order/{id:int}/print"
+@layout PrintLayout
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize]
+@inject IOrderService OrderService
+@inject IConfiguration Configuration
+
+@if (isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Loading invoice...</p>
+    </div>
+}
+else if (order != null)
+{
+    <div class="invoice-container">
+        <!-- Invoice Header -->
+        <div class="invoice-header">
+            <div class="row">
+                <div class="col-md-6">
+                    <h1 class="invoice-title">TUNIS MOTORS</h1>
+                    <p class="invoice-subtitle">INVOICE</p>
+                    <div class="invoice-company-info">
+                        <p><strong>Address:</strong> Tunis, Tunisia</p>
+                        <p><strong>Phone:</strong> +216 95 518 4</p>
+                        <p><strong>Email:</strong> contact@carecommerce.tn</p>
+                        <p><strong>Website:</strong> www.tunismotors.tn</p>
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="invoice-number-box">
+                        <p class="invoice-label">INVOICE #</p>
+                        <p class="invoice-number">@order.Id</p>
+                    </div>
+                    <div class="invoice-date-box mt-3">
+                        <p class="invoice-label">DATE</p>
+                        <p class="invoice-date">@order.OrderDate.ToString("MMMM dd, yyyy")</p>
+                    </div>
+                    <div class="invoice-time-box mt-2">
+                        <p class="invoice-label">TIME</p>
+                        <p class="invoice-time">@order.OrderDate.ToString("hh:mm tt")</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer Information -->
+        <div class="customer-info-section">
+            <div class="row">
+                <div class="col-md-6">
+                    <h3 class="section-title">Bill To:</h3>
+                    <div class="customer-details">
+                        <p><strong>@order.CustomerName</strong></p>
+                        <p>@order.Email</p>
+                        <p>@order.Address</p>
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <h3 class="section-title">Order Information:</h3>
+                    <div class="order-details">
+                        <p><strong>Status:</strong> <span class="badge-status">@order.Status</span></p>
+                        <p><strong>Payment Method:</strong> @order.PaymentMethod.ToUpper()</p>
+                        <p><strong>Order Date:</strong> @order.OrderDate.ToString("MMMM dd, yyyy 'at' hh:mm tt")</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Items Table -->
+        <div class="items-section">
+            <h3 class="section-title">Order Items</h3>
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th class="col-item">Item</th>
+                        <th class="col-qty">Qty</th>
+                        <th class="col-price">Unit Price</th>
+                        <th class="col-total">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (order.Items != null && order.Items.Any())
+                    {
+                        @foreach (var item in order.Items)
+                        {
+                            <tr>
+                                <td class="col-item">
+                                    <div class="item-name">
+                                        <strong>@item.ProductName</strong>
+                                        @if (item.Product != null)
+                                        {
+                                            <br />
+                                            <small>@item.Product.Brand @item.Product.Year</small>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="col-qty text-center">@item.Quantity</td>
+                                <td class="col-price text-end">@item.Price.ToString("N0") TND</td>
+                                <td class="col-total text-end">@((item.Price * item.Quantity).ToString("N0")) TND</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center">No items in this order.</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="subtotal-row">
+                        <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                        <td class="text-end"><strong>@order.TotalAmount.ToString("N0") TND</strong></td>
+                    </tr>
+                    <tr class="tax-row">
+                        <td colspan="3" class="text-end"><strong>Tax:</strong></td>
+                        <td class="text-end"><strong>--</strong></td>
+                    </tr>
+                    <tr class="total-row">
+                        <td colspan="3" class="text-end"><strong>TOTAL:</strong></td>
+                        <td class="text-end"><strong class="total-amount">@order.TotalAmount.ToString("N0") TND</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Footer Section -->
+        <div class="invoice-footer">
+            <div class="row">
+                <div class="col-md-6">
+                    @if (!string.IsNullOrEmpty(order.Notes))
+                    {
+                        <div class="notes-section">
+                            <h4>Notes:</h4>
+                            <p>@order.Notes</p>
+                        </div>
+                    }
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="payment-terms">
+                        <p><strong>Payment Terms:</strong> @order.PaymentMethod</p>
+                        <p><strong>Status:</strong> @order.Status</p>
+                    </div>
+                </div>
+            </div>
+            <div class="thank-you-section">
+                <p class="thank-you-text">Thank you for your business!</p>
+                <p class="company-tagline">Tunis Motors - Drive Your Future</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Button (Screen Only) -->
+    <div class="screen-only text-center mt-4 mb-4">
+        <button class="btn btn-primary btn-lg" @onclick="TriggerPrint">
+            <i class="fa fa-print me-2"></i>Print Invoice
+        </button>
+        <button class="btn btn-secondary btn-lg ms-2" @onclick="GoBack">
+            <i class="fa fa-arrow-left me-2"></i>Back to Order
+        </button>
+    </div>
+}
+else
+{
+    <div class="text-center py-5">
+        <i class="fa fa-exclamation-circle fa-4x text-danger mb-3"></i>
+        <h4>Order Not Found</h4>
+        <p class="text-muted">The order you're looking for doesn't exist.</p>
+        <button class="btn btn-primary" @onclick="GoBack">
+            <i class="fa fa-arrow-left me-2"></i>Go Back
+        </button>
+    </div>
+}
+
+<style>
+    /* Screen Styles */
+    .invoice-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #fff;
+    }
+
+    .invoice-header {
+        border-bottom: 3px solid #d32f2f;
+        padding-bottom: 30px;
+        margin-bottom: 30px;
+    }
+
+    .invoice-title {
+        font-size: 36pt;
+        font-weight: bold;
+        color: #d32f2f;
+        margin: 0;
+        letter-spacing: 3px;
+    }
+
+    .invoice-subtitle {
+        font-size: 20pt;
+        color: #666;
+        margin: 10px 0 25px 0;
+        font-weight: 300;
+        text-transform: uppercase;
+    }
+
+    .invoice-company-info {
+        font-size: 11pt;
+        line-height: 2;
+        color: #555;
+    }
+
+    .invoice-number-box,
+    .invoice-date-box,
+    .invoice-time-box {
+        display: inline-block;
+        border: 2px solid #333;
+        padding: 15px 30px;
+        text-align: center;
+        min-width: 180px;
+        margin-left: 10px;
+    }
+
+    .invoice-label {
+        font-size: 10pt;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        margin: 0;
+        color: #666;
+        font-weight: 600;
+    }
+
+    .invoice-number {
+        font-size: 28pt;
+        font-weight: bold;
+        margin: 8px 0 0 0;
+        color: #d32f2f;
+    }
+
+    .invoice-date,
+    .invoice-time {
+        font-size: 16pt;
+        font-weight: bold;
+        margin: 8px 0 0 0;
+        color: #333;
+    }
+
+    .customer-info-section,
+    .items-section {
+        margin: 30px 0;
+    }
+
+    .section-title {
+        font-size: 16pt;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #ddd;
+        padding-bottom: 8px;
+    }
+
+    .customer-details,
+    .order-details {
+        font-size: 11pt;
+        line-height: 1.8;
+    }
+
+    .badge-status {
+        display: inline-block;
+        padding: 4px 12px;
+        background-color: #333;
+        color: #fff;
+        border-radius: 4px;
+        font-size: 10pt;
+        font-weight: bold;
+    }
+
+    .invoice-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+
+    .invoice-table thead {
+        background-color: #333;
+        color: #fff;
+    }
+
+    .invoice-table th {
+        padding: 15px 12px;
+        text-align: left;
+        font-weight: bold;
+        border: 1px solid #000;
+        font-size: 11pt;
+    }
+
+    .invoice-table th.col-item {
+        width: 50%;
+    }
+
+    .invoice-table th.col-qty {
+        width: 15%;
+        text-align: center;
+    }
+
+    .invoice-table th.col-price,
+    .invoice-table th.col-total {
+        width: 17.5%;
+        text-align: right;
+    }
+
+    .invoice-table td {
+        padding: 12px;
+        border: 1px solid #ddd;
+        font-size: 11pt;
+    }
+
+    .invoice-table tbody tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+
+    .invoice-table tfoot {
+        background-color: #f5f5f5;
+        font-weight: bold;
+    }
+
+    .invoice-table tfoot td {
+        border-top: 2px solid #333;
+        padding: 15px 12px;
+        font-size: 12pt;
+    }
+
+    .total-row {
+        background-color: #333 !important;
+        color: #fff !important;
+    }
+
+    .total-row td {
+        border-color: #000 !important;
+    }
+
+    .total-amount {
+        font-size: 18pt;
+        color: #fff !important;
+    }
+
+    .invoice-footer {
+        margin-top: 50px;
+        padding-top: 30px;
+        border-top: 2px solid #ddd;
+    }
+
+    .notes-section,
+    .payment-terms {
+        font-size: 11pt;
+        line-height: 1.8;
+    }
+
+    .thank-you-section {
+        text-align: center;
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid #ddd;
+    }
+
+    .thank-you-text {
+        font-size: 14pt;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .company-tagline {
+        font-size: 12pt;
+        color: #d32f2f;
+        font-style: italic;
+    }
+
+    .screen-only {
+        display: block;
+    }
+
+    /* Print Styles */
+    @@media print {
+        @@page {
+            size: A4;
+            margin: 1.5cm;
+        }
+
+        body {
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #000;
+            background: #fff;
+        }
+
+        .screen-only {
+            display: none !important;
+        }
+
+        .invoice-container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .invoice-header {
+            page-break-after: avoid;
+        }
+
+        .invoice-table {
+            page-break-inside: avoid;
+        }
+
+        .invoice-footer {
+            page-break-inside: avoid;
+        }
+
+        .items-section {
+            page-break-inside: avoid;
+        }
+
+        .fa {
+            display: none;
+        }
+
+        body::after {
+            content: "Tunis Motors - Drive Your Future | www.tunismotors.tn";
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 9pt;
+            color: #999;
+            padding: 8px;
+            border-top: 1px solid #ddd;
+            background: #fff;
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private OrderDto? order;
+    private bool isLoading = true;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = null!;
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrder();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && order != null)
+        {
+            // Auto-print when page loads
+            await Task.Delay(500);
+            await TriggerPrint();
+        }
+    }
+
+    private async Task LoadOrder()
+    {
+        try
+        {
+            isLoading = true;
+            order = await OrderService.GetOrderByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading order: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task TriggerPrint()
+    {
+        await JSRuntime.InvokeVoidAsync("window.print");
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo($"/order/details/{Id}");
+    }
+}
+

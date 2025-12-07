@@ -1,0 +1,328 @@
+@page "/admin/list-roles"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject IAdminService AdminService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Role Management</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/admin">Dashboard</a></li>
+                    <li class="active">Roles</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-1"><i class="fa fa-users-cog me-2 text-primary"></i>Role Management</h1>
+            <p class="text-muted mb-0">Manage user roles and permissions</p>
+        </div>
+        <a href="/admin/create-role" class="btn btn-primary btn-lg">
+            <i class="fa fa-plus-circle me-2"></i>Create New Role
+        </a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fa fa-check-circle me-2"></i>@successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fa fa-exclamation-circle me-2"></i>@errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading roles...</p>
+        </div>
+    }
+    else if (roles != null && roles.Any())
+    {
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="display-4 text-primary mb-2">
+                            <i class="fa fa-users"></i>
+                        </div>
+                        <h3 class="h4 mb-1">@roles.Count</h3>
+                        <small class="text-muted">Total Roles</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="display-4 text-success mb-2">
+                            <i class="fa fa-shield-alt"></i>
+                        </div>
+                        <h3 class="h4 mb-1">@roles.Count(r => r.Name.Contains("Admin"))</h3>
+                        <small class="text-muted">Admin Roles</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="display-4 text-info mb-2">
+                            <i class="fa fa-user-tie"></i>
+                        </div>
+                        <h3 class="h4 mb-1">@roles.Count(r => r.Name.Contains("Manager"))</h3>
+                        <small class="text-muted">Manager Roles</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="display-4 text-warning mb-2">
+                            <i class="fa fa-store"></i>
+                        </div>
+                        <h3 class="h4 mb-1">@roles.Count(r => r.Name.Contains("Seller"))</h3>
+                        <small class="text-muted">Seller Roles</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Roles Grid -->
+        <div class="row">
+            @foreach (var role in roles)
+            {
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card border-0 shadow-lg h-100">
+                        <div class="card-header bg-gradient-primary text-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fa fa-user-shield me-2"></i>@role.Name
+                                </h5>
+                                <span class="badge bg-light text-dark">@role.Id.Substring(0, Math.Min(8, role.Id.Length))</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Role ID</small>
+                                <code class="small">@role.Id</code>
+                            </div>
+
+                            <!-- Role Description -->
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Description</small>
+                                <p class="mb-0 small">
+                                    @{
+                                        var roleName = role.Name.ToLower();
+                                        if (roleName.Contains("admin"))
+                                        {
+                                            <text><i class="fa fa-crown text-warning me-1"></i>Full system access and management</text>
+                                        }
+                                        else if (roleName.Contains("manager"))
+                                        {
+                                            <text><i class="fa fa-clipboard-check text-info me-1"></i>Content approval and oversight</text>
+                                        }
+                                        else if (roleName.Contains("seller"))
+                                        {
+                                            <text><i class="fa fa-store text-success me-1"></i>Product listing and sales management</text>
+                                        }
+                                        else
+                                        {
+                                            <text><i class="fa fa-user text-muted me-1"></i>Custom role with specific permissions</text>
+                                        }
+                                    }
+                                </p>
+                            </div>
+
+                            <!-- User Count -->
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Assigned Users</small>
+                                <span class="badge bg-secondary">
+                                    <i class="fa fa-users me-1"></i>
+                                    @role.UserCount users
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-light">
+                            <div class="d-flex gap-2">
+                                <a href="/admin/edit-role/@role.Id"
+                                   class="btn btn-outline-primary btn-sm flex-fill">
+                                    <i class="fa fa-edit me-1"></i>Edit
+                                </a>
+                                @if (!new[] { "Admin", "Manager", "Seller" }.Contains(role.Name))
+                                {
+                                    <button class="btn btn-outline-danger btn-sm flex-fill"
+                                            @onclick="() => ConfirmDelete(role.Id, role.Name)">
+                                        <i class="fa fa-trash me-1"></i>Delete
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-outline-secondary btn-sm flex-fill" disabled>
+                                        <i class="fa fa-lock me-1"></i>System Role
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- System Roles Notice -->
+        <div class="card border-0 shadow-lg mt-4">
+            <div class="card-body">
+                <div class="alert alert-info mb-0">
+                    <i class="fa fa-info-circle me-2"></i>
+                    <strong>System Roles:</strong> Admin, Manager, and Seller roles are protected system roles and cannot be deleted.
+                    They provide essential functionality for the platform.
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Empty State -->
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="fa fa-users-cog fa-5x text-muted"></i>
+            </div>
+            <h3 class="text-muted mb-3">No Roles Created Yet</h3>
+            <p class="text-muted mb-4">
+                Start by creating your first user role to manage access permissions.<br>
+                Common roles include Admin, Manager, and Seller.
+            </p>
+            <a href="/admin/create-role" class="btn btn-primary btn-lg">
+                <i class="fa fa-plus-circle me-2"></i>Create Your First Role
+            </a>
+        </div>
+    }
+
+    <!-- Delete Confirmation Modal -->
+    @if (roleToDelete != null)
+    {
+        <div class="modal fade show d-block" style="background-color: rgba(0,0,0,.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fa fa-exclamation-triangle text-warning me-2"></i>Confirm Deletion
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete the role <strong>@roleToDeleteName</strong>?</p>
+                        <div class="alert alert-warning">
+                            <i class="fa fa-warning me-2"></i>
+                            This action cannot be undone. All users assigned to this role will lose their permissions.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                        <button type="button" class="btn btn-danger" @onclick="DeleteRoleConfirmed">
+                            <i class="fa fa-trash me-2"></i>Delete Role
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<RoleDto> roles = new();
+    private bool isLoading = true;
+    private string successMessage = "";
+    private string errorMessage = "";
+    private string roleToDelete = null;
+    private string roleToDeleteName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRoles();
+    }
+
+    private async Task LoadRoles()
+    {
+        try
+        {
+            isLoading = true;
+            roles = await AdminService.GetAllRolesAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load roles.";
+            Console.WriteLine($"Load roles error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ConfirmDelete(string roleId, string roleName)
+    {
+        roleToDelete = roleId;
+        roleToDeleteName = roleName;
+    }
+
+    private void CancelDelete()
+    {
+        roleToDelete = null;
+        roleToDeleteName = "";
+    }
+
+    private async Task DeleteRoleConfirmed()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(roleToDelete)) return;
+
+            var result = await AdminService.DeleteRoleAsync(roleToDeleteName);
+            if (result.Success)
+            {
+                successMessage = $"Role '{roleToDeleteName}' deleted successfully!";
+                roleToDelete = null;
+                roleToDeleteName = "";
+                await LoadRoles();
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Failed to delete role.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Delete role error: {ex.Message}");
+        }
+    }
+}

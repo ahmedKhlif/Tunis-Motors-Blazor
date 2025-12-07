@@ -1,0 +1,736 @@
+@page "/create-listing"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using BlazorApp.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using System.ComponentModel.DataAnnotations
+@attribute [Authorize(Roles = "Seller,Admin,Manager")]
+@inject ICarListingService CarListingService
+@inject ICategoryService CategoryService
+@inject IAuthService AuthService
+@inject NavigationManager NavManager
+@inject IJSRuntime JSRuntime
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Create Listing</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/my-listings">My Listings</a></li>
+                    <li class="active">Create Listing</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fa fa-plus-circle me-2"></i>Add New Car Listing</h4>
+                    <small>Your listing will be reviewed by our team before being published.</small>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success">@successMessage</div>
+                    }
+
+                    <!-- Notification Dialog -->
+                    <NotificationDialog @bind-Show="showNotification" 
+                                      Title="@notificationTitle" 
+                                      Message="@notificationMessage" 
+                                      Type="@notificationType"
+                                      OnClose="OnNotificationClose" />
+
+                    <EditForm Model="@model" OnValidSubmit="HandleSubmit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger mb-4" />
+
+                        <div class="row">
+                            <!-- Basic Information -->
+                            <div class="col-lg-6">
+                                <h5 class="mb-3 text-primary"><i class="fa fa-info-circle me-2"></i>Basic Information</h5>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Car Model <span class="text-danger">*</span></label>
+                                    <InputText @bind-Value="model.Name" class="form-control" placeholder="e.g., Toyota Corolla 2020" />
+                                    <ValidationMessage For="@(() => model.Name)" />
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Brand <span class="text-danger">*</span></label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               placeholder="e.g., Toyota" 
+                                               list="brandSuggestions"
+                                               @bind="model.Brand"
+                                               @oninput="OnBrandInput" />
+                                        <datalist id="brandSuggestions">
+                                            @if (availableBrands != null)
+                                            {
+                                                @foreach (var brand in filteredBrands)
+                                                {
+                                                    <option value="@brand" />
+                                                }
+                                            }
+                                        </datalist>
+                                        <small class="text-muted d-block mt-1">
+                                            <i class="fa fa-lightbulb me-1"></i>
+                                            Suggestions based on @(availableBrands?.Count ?? 0) existing brands
+                                        </small>
+                                        <ValidationMessage For="@(() => model.Brand)" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Year <span class="text-danger">*</span></label>
+                                        <InputNumber @bind-Value="model.Year" class="form-control" min="1900" max="@DateTime.Now.Year" />
+                                        <ValidationMessage For="@(() => model.Year)" />
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Price (TND) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <InputNumber @bind-Value="model.Price" class="form-control" step="0.01" placeholder="0.00" />
+                                        <span class="input-group-text">TND</span>
+                                    </div>
+                                    <ValidationMessage For="@(() => model.Price)" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Category <span class="text-danger">*</span></label>
+                                    <InputSelect @bind-Value="model.CategoryId" class="form-control">
+                                        <option value="">-- Select Category --</option>
+                                        @foreach (var cat in categories)
+                                        {
+                                            <option value="@cat.CategoryId">@cat.CategoryName</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => model.CategoryId)" />
+                                </div>
+                            </div>
+
+                            <!-- Technical Specifications -->
+                            <div class="col-lg-6">
+                                <h5 class="mb-3 text-primary"><i class="fa fa-cogs me-2"></i>Technical Specifications</h5>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Mileage (km) <span class="text-danger">*</span></label>
+                                        <InputNumber @bind-Value="model.Mileage" class="form-control" placeholder="e.g., 50000" />
+                                        <ValidationMessage For="@(() => model.Mileage)" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Fuel Type <span class="text-danger">*</span></label>
+                                        <InputSelect @bind-Value="model.FuelType" class="form-control">
+                                            <option value="">-- Select Fuel Type --</option>
+                                            <option value="Petrol">Petrol</option>
+                                            <option value="Diesel">Diesel</option>
+                                            <option value="Electric">Electric</option>
+                                            <option value="Hybrid">Hybrid</option>
+                                            <option value="LPG">LPG</option>
+                                        </InputSelect>
+                                        <ValidationMessage For="@(() => model.FuelType)" />
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Transmission <span class="text-danger">*</span></label>
+                                        <InputSelect @bind-Value="model.Transmission" class="form-control">
+                                            <option value="">-- Select Transmission --</option>
+                                            <option value="Manual">Manual</option>
+                                            <option value="Automatic">Automatic</option>
+                                            <option value="CVT">CVT</option>
+                                            <option value="Semi-Automatic">Semi-Automatic</option>
+                                        </InputSelect>
+                                        <ValidationMessage For="@(() => model.Transmission)" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Color <span class="text-danger">*</span></label>
+                                        <div class="input-group">
+                                            <input type="color" @bind="model.Color" @bind:event="oninput" class="form-control form-control-color" style="width: 80px;" />
+                                            <InputText @bind-Value="model.Color" class="form-control" placeholder="e.g., #000000 or Black" />
+                                        </div>
+                                        <ValidationMessage For="@(() => model.Color)" />
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Engine Size (L)</label>
+                                        <InputNumber @bind-Value="model.EngineSize" class="form-control" step="0.1" placeholder="e.g., 1.6" />
+                                        <ValidationMessage For="@(() => model.EngineSize)" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Horsepower</label>
+                                        <InputNumber @bind-Value="model.Horsepower" class="form-control" placeholder="e.g., 120" />
+                                        <ValidationMessage For="@(() => model.Horsepower)" />
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Number of Doors</label>
+                                        <InputSelect @bind-Value="model.Doors" class="form-control">
+                                            <option value="">-- Select Doors --</option>
+                                            <option value="2">2 Doors</option>
+                                            <option value="3">3 Doors</option>
+                                            <option value="4">4 Doors</option>
+                                            <option value="5">5 Doors</option>
+                                        </InputSelect>
+                                        <ValidationMessage For="@(() => model.Doors)" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Number of Seats</label>
+                                        <InputSelect @bind-Value="model.Seats" class="form-control">
+                                            <option value="">-- Select Seats --</option>
+                                            <option value="2">2 Seats</option>
+                                            <option value="4">4 Seats</option>
+                                            <option value="5">5 Seats</option>
+                                            <option value="7">7 Seats</option>
+                                            <option value="9">9 Seats</option>
+                                        </InputSelect>
+                                        <ValidationMessage For="@(() => model.Seats)" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Information -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h5 class="mb-3 text-primary"><i class="fa fa-plus-circle me-2"></i>Additional Information</h5>
+
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Condition <span class="text-danger">*</span></label>
+                                        <InputSelect @bind-Value="model.Condition" class="form-control">
+                                            <option value="New">New</option>
+                                            <option value="Used" selected>Used</option>
+                                            <option value="Certified Pre-Owned">Certified Pre-Owned</option>
+                                        </InputSelect>
+                                        <ValidationMessage For="@(() => model.Condition)" />
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Rating <span class="text-danger">*</span></label>
+                                        <InputSelect @bind-Value="model.Rating" class="form-control">
+                                            <option value="1">⭐ (1 Star)</option>
+                                            <option value="2">⭐⭐ (2 Stars)</option>
+                                            <option value="3">⭐⭐⭐ (3 Stars)</option>
+                                            <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
+                                            <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
+                                        </InputSelect>
+                                        <ValidationMessage For="@(() => model.Rating)" />
+                                        <small class="form-text text-muted">Rate your car's condition/quality</small>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">VIN Number</label>
+                                        <InputText @bind-Value="model.VIN" class="form-control" placeholder="Vehicle Identification Number" maxlength="17" />
+                                        <ValidationMessage For="@(() => model.VIN)" />
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Location</label>
+                                    <InputText @bind-Value="model.Location" class="form-control" placeholder="e.g., Tunis, Tunisia" />
+                                    <ValidationMessage For="@(() => model.Location)" />
+                                </div>
+
+                                <!-- Stock Management -->
+                                <div class="card border-info mb-3">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0"><i class="fa fa-boxes me-2"></i>Stock Management</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Quantity in Stock (For Sale) <span class="text-danger">*</span></label>
+                                            <InputNumber @bind-Value="model.QuantityInStock" class="form-control" min="0" />
+                                            <ValidationMessage For="@(() => model.QuantityInStock)" />
+                                            <small class="form-text text-muted">
+                                                <i class="fa fa-info-circle me-1"></i>
+                                                Total number of cars available for purchase. Set to 0 if only available for rental.
+                                            </small>
+                                        </div>
+
+                                        <!-- Rental Options -->
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <InputCheckbox @bind-Value="model.IsAvailableForRental" class="form-check-input" />
+                                                <label class="form-check-label fw-bold">
+                                                    Make this car available for rental
+                                                </label>
+                                            </div>
+                                            <small class="form-text text-muted">Allow customers to rent this car on a daily basis</small>
+                                        </div>
+
+                                        @if (model.IsAvailableForRental)
+                                        {
+                                            <div class="row">
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label">Rental Stock <span class="text-danger">*</span></label>
+                                                    <InputNumber @bind-Value="model.RentalStock" class="form-control" min="1" placeholder="Number of cars available for rental" />
+                                                    <ValidationMessage For="@(() => model.RentalStock)" />
+                                                    <small class="form-text text-muted">
+                                                        <i class="fa fa-info-circle me-1"></i>
+                                                        How many cars are available for rental. This is separate from sale stock.
+                                                    </small>
+                                                </div>
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label">Daily Rental Rate (TND) <span class="text-danger">*</span></label>
+                                                    <div class="input-group">
+                                                        <InputNumber @bind-Value="model.DailyRentalRate" class="form-control" step="0.01" min="0" placeholder="Price per day" />
+                                                        <span class="input-group-text">TND/day</span>
+                                                    </div>
+                                                    <ValidationMessage For="@(() => model.DailyRentalRate)" />
+                                                    <small class="form-text text-muted">
+                                                        <i class="fa fa-dollar me-1"></i>
+                                                        Daily rental price in Tunisian Dinars
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <InputTextArea @bind-Value="model.Description" class="form-control" rows="4" placeholder="Describe your car..." />
+                                    <ValidationMessage For="@(() => model.Description)" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Features</label>
+                                    <InputTextArea @bind-Value="model.Features" class="form-control" rows="3" placeholder="List special features, accessories, etc." />
+                                    <ValidationMessage For="@(() => model.Features)" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Car Images <span class="text-danger">*</span></label>
+                                    <div class="border rounded p-4 text-center bg-light" style="border-style: dashed !important; min-height: 200px;"
+                                         @ondragover:preventDefault="true"
+                                         @ondrop:preventDefault="true">
+                                        <InputFile OnChange="HandleFileSelected" class="form-control" accept="image/*" multiple id="imageUpload" style="display: none;" />
+                                        <label for="imageUpload" class="d-block" style="cursor: pointer;">
+                                            <i class="fa fa-cloud-upload fa-3x text-primary mb-3"></i>
+                                            <p class="mb-2"><strong>Drag and drop images here</strong></p>
+                                            <p class="text-muted mb-2">or click to browse</p>
+                                            <p class="text-muted small">Upload multiple clear photos of your car (main image first)</p>
+                                            <p class="text-muted small">Max 10 images, 10MB each. Supported: JPG, PNG, GIF</p>
+                                        </label>
+                                    </div>
+                                    
+                                    @if (selectedFiles.Any())
+                                    {
+                                        <div class="mt-3">
+                                            <p class="mb-2"><strong>Selected Images (@selectedFiles.Count)</strong></p>
+                                            <div class="row g-2">
+                                                @foreach (var file in selectedFiles)
+                                                {
+                                                    <div class="col-md-3">
+                                                        <div class="card">
+                                                            <div class="card-body p-2">
+                                                                <div class="d-flex justify-content-between align-items-center">
+                                                                    <small class="text-truncate me-2">@file.Name</small>
+                                                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveFile(file)">
+                                                                        <i class="fa fa-times"></i>
+                                                                    </button>
+                                                                </div>
+                                                                <small class="text-muted">@FormatFileSize(file.Size)</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                    
+                                    @if (!string.IsNullOrEmpty(fileError))
+                                    {
+                                        <div class="alert alert-danger mt-2">@fileError</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <button type="button" class="btn btn-outline-secondary" @onclick='() => NavManager.NavigateTo("/shop")'>
+                                        <i class="fa fa-arrow-left me-2"></i>Back to Listings
+                                    </button>
+                                    <button type="submit" class="btn btn-success btn-lg" disabled="@isLoading">
+                                        @if (isLoading)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            <span>Submitting...</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="fa fa-save me-2"></i>
+                                            <span>Submit for Approval</span>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+<!-- /SECTION -->
+
+@code {
+    private CreateListingModel model = new();
+    private List<IBrowserFile> selectedFiles = new();
+    private List<CategoryDto> categories = new();
+    private List<string> availableBrands = new();
+    private List<string> filteredBrands = new();
+    private string errorMessage = "";
+    private string successMessage = "";
+    private string fileError = "";
+    private bool isLoading = false;
+    private const int MaxFiles = 5;
+    private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
+    
+    // Notification dialog
+    private bool showNotification = false;
+    private string notificationTitle = "";
+    private string notificationMessage = "";
+    private NotificationType notificationType = NotificationType.Info;
+    
+    private void ShowNotification(string title, string message, NotificationType type = NotificationType.Info)
+    {
+        notificationTitle = title;
+        notificationMessage = message;
+        notificationType = type;
+        showNotification = true;
+        StateHasChanged();
+    }
+    
+    private void OnNotificationClose()
+    {
+        showNotification = false;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            categories = await CategoryService.GetAllCategoriesAsync();
+            availableBrands = await CarListingService.GetBrandsAsync();
+            filteredBrands = availableBrands ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading data: {ex.Message}";
+        }
+    }
+
+    private void OnBrandInput(ChangeEventArgs e)
+    {
+        var input = e.Value?.ToString() ?? string.Empty;
+        model.Brand = input;
+
+        // Filter brands based on user input
+        if (string.IsNullOrEmpty(input))
+        {
+            filteredBrands = availableBrands ?? new List<string>();
+        }
+        else
+        {
+            filteredBrands = availableBrands?
+                .Where(b => b.Contains(input, StringComparison.OrdinalIgnoreCase))
+                .ToList() ?? new List<string>();
+        }
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        fileError = "";
+        var files = e.GetMultipleFiles(MaxFiles);
+        
+        foreach (var file in files)
+        {
+            // Validate file size
+            if (file.Size > MaxFileSize)
+            {
+                fileError = $"File {file.Name} exceeds 10MB limit.";
+                return;
+            }
+            
+            // Validate file type
+            if (!file.ContentType.StartsWith("image/"))
+            {
+                fileError = $"File {file.Name} is not a valid image.";
+                return;
+            }
+            
+            // Check if already added
+            if (!selectedFiles.Any(f => f.Name == file.Name))
+            {
+                selectedFiles.Add(file);
+            }
+        }
+        
+        if (selectedFiles.Count > MaxFiles)
+        {
+            fileError = $"Maximum {MaxFiles} images allowed.";
+            selectedFiles = selectedFiles.Take(MaxFiles).ToList();
+        }
+    }
+
+    private void RemoveFile(IBrowserFile file)
+    {
+        selectedFiles.Remove(file);
+        fileError = "";
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private async Task HandleSubmit()
+    {
+        isLoading = true;
+        errorMessage = "";
+        successMessage = "";
+        fileError = "";
+
+        try
+        {
+            // Validate rental fields if rental is enabled
+            if (model.IsAvailableForRental)
+            {
+                if (model.RentalStock < 1)
+                {
+                    errorMessage = "Rental Stock must be at least 1 when rental is enabled.";
+                    isLoading = false;
+                    return;
+                }
+                if (!model.DailyRentalRate.HasValue || model.DailyRentalRate.Value <= 0)
+                {
+                    errorMessage = "Daily Rental Rate must be greater than 0 when rental is enabled.";
+                    isLoading = false;
+                    return;
+                }
+            }
+            
+            // Validate files
+            if (!selectedFiles.Any())
+            {
+                fileError = "Please upload at least one image.";
+                isLoading = false;
+                return;
+            }
+
+            // Upload images to server
+            Console.WriteLine($"[CreateListing] Starting image upload. Files count: {selectedFiles.Count}");
+            foreach (var file in selectedFiles)
+            {
+                Console.WriteLine($"[CreateListing] File: {file.Name}, Size: {file.Size} bytes, Type: {file.ContentType}");
+            }
+            
+            var uploadedPaths = await CarListingService.UploadImagesAsync(selectedFiles);
+            Console.WriteLine($"[CreateListing] Upload result: {(uploadedPaths != null ? uploadedPaths.Count : 0)} images uploaded");
+            
+            if (uploadedPaths == null || !uploadedPaths.Any())
+            {
+                Console.WriteLine("[CreateListing] ERROR: Image upload failed - no paths returned");
+                ShowNotification("Upload Failed", "Failed to upload images. Please check console for details and try again.", NotificationType.Error);
+                isLoading = false;
+                return;
+            }
+            
+            Console.WriteLine($"[CreateListing] Successfully uploaded {uploadedPaths.Count} images:");
+            foreach (var path in uploadedPaths)
+            {
+                Console.WriteLine($"[CreateListing]   - {path}");
+            }
+
+            // First image is main image
+            var mainImage = uploadedPaths.FirstOrDefault() ?? "/images/noimage.jpg";
+            
+            // Remaining images as JSON array (skip first image)
+            string? additionalImagesJson = null;
+            if (uploadedPaths.Count > 1)
+            {
+                var additionalImages = uploadedPaths.Skip(1).ToList();
+                additionalImagesJson = System.Text.Json.JsonSerializer.Serialize(additionalImages);
+            }
+            
+            var createDto = new CreateCarListingDto
+            {
+                Name = model.Name,
+                Price = model.Price,
+                Mileage = model.Mileage ?? 0,
+                Year = model.Year ?? DateTime.Now.Year,
+                Brand = model.Brand,
+                FuelType = model.FuelType,
+                Transmission = model.Transmission,
+                Color = model.Color,
+                VIN = model.VIN,
+                EngineSize = model.EngineSize,
+                Horsepower = model.Horsepower,
+                Doors = model.Doors,
+                Seats = model.Seats,
+                Description = model.Description,
+                Features = model.Features,
+                Condition = model.Condition,
+                Rating = model.Rating,
+                Image = mainImage, // First uploaded file
+                AdditionalImages = additionalImagesJson, // JSON array of remaining files
+                Location = model.Location,
+                CategoryId = model.CategoryId,
+                QuantityInStock = model.QuantityInStock ?? 1,
+                IsAvailableForRental = model.IsAvailableForRental,
+                RentalStock = model.RentalStock,
+                DailyRentalRate = model.DailyRentalRate
+            };
+
+            Console.WriteLine($"[CreateListing] Creating listing with data:");
+            Console.WriteLine($"[CreateListing]   Name: {createDto.Name}");
+            Console.WriteLine($"[CreateListing]   Price: {createDto.Price}");
+            Console.WriteLine($"[CreateListing]   QuantityInStock: {createDto.QuantityInStock}");
+            Console.WriteLine($"[CreateListing]   IsAvailableForRental: {createDto.IsAvailableForRental}");
+            Console.WriteLine($"[CreateListing]   RentalStock: {createDto.RentalStock}");
+            Console.WriteLine($"[CreateListing]   DailyRentalRate: {createDto.DailyRentalRate}");
+            Console.WriteLine($"[CreateListing]   Image: {createDto.Image}");
+            Console.WriteLine($"[CreateListing]   AdditionalImages: {createDto.AdditionalImages}");
+            
+            var result = await CarListingService.CreateListingAsync(createDto);
+            
+            if (result != null)
+            {
+                Console.WriteLine($"[CreateListing] Listing created successfully! ID: {result.Id}");
+                ShowNotification("Success", "Listing submitted successfully! Redirecting to your listings...", NotificationType.Success);
+                await Task.Delay(2000);
+                NavManager.NavigateTo("/my-listings");
+            }
+            else
+            {
+                Console.WriteLine("[CreateListing] ERROR: Failed to create listing - result is null");
+                ShowNotification("Error", "Failed to create listing. Please try again.", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public class CreateListingModel
+    {
+        [Required(ErrorMessage = "Car Model is required")]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Car Model must be between 2 and 100 characters")]
+        public string Name { get; set; }
+
+        [Required(ErrorMessage = "Price is required")]
+        [Range(0, double.MaxValue, ErrorMessage = "Price must be positive")]
+        public decimal Price { get; set; }
+
+        [Required(ErrorMessage = "Mileage is required")]
+        [Range(0, int.MaxValue, ErrorMessage = "Mileage must be positive")]
+        public int? Mileage { get; set; }
+
+        [Required(ErrorMessage = "Year is required")]
+        [Range(1900, 2030, ErrorMessage = "Year must be between 1900 and 2030")]
+        public int? Year { get; set; }
+
+        [Required(ErrorMessage = "Brand is required")]
+        [StringLength(50)]
+        public string Brand { get; set; }
+
+        [Required(ErrorMessage = "Fuel Type is required")]
+        [StringLength(50)]
+        public string FuelType { get; set; }
+
+        [Required(ErrorMessage = "Transmission is required")]
+        [StringLength(50)]
+        public string Transmission { get; set; }
+
+        [Required(ErrorMessage = "Color is required")]
+        [StringLength(50)]
+        public string Color { get; set; }
+
+        [StringLength(17)]
+        public string VIN { get; set; }
+
+        [Range(0, 10)]
+        public decimal? EngineSize { get; set; }
+
+        [Range(0, 2000)]
+        public int? Horsepower { get; set; }
+
+        [Range(2, 5)]
+        public int? Doors { get; set; }
+
+        [Range(2, 9)]
+        public int? Seats { get; set; }
+
+        [StringLength(1000)]
+        public string Description { get; set; }
+
+        [StringLength(500)]
+        public string Features { get; set; }
+
+        [Required(ErrorMessage = "Condition is required")]
+        public string Condition { get; set; }
+
+        [Required(ErrorMessage = "Rating is required")]
+        [Range(1, 5, ErrorMessage = "Rating must be between 1 and 5")]
+        public int Rating { get; set; }
+
+        [StringLength(100)]
+        public string Location { get; set; }
+
+        [Required(ErrorMessage = "Category is required")]
+        public int? CategoryId { get; set; }
+
+        [Required(ErrorMessage = "Quantity in Stock is required")]
+        [Range(0, int.MaxValue)]
+        public int? QuantityInStock { get; set; } = 1;
+
+        public bool IsAvailableForRental { get; set; } = false;
+
+        [Range(1, int.MaxValue, ErrorMessage = "Rental Stock must be at least 1 when rental is enabled")]
+        public int RentalStock { get; set; } = 0;
+
+        [Range(0.01, double.MaxValue, ErrorMessage = "Daily Rental Rate must be greater than 0 when rental is enabled")]
+        public decimal? DailyRentalRate { get; set; }
+    }
+}

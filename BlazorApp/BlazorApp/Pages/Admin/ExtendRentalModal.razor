@@ -1,0 +1,77 @@
+@using BlazorApp.Models
+
+<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Extend Rental Period</h5>
+                <button type="button" class="btn-close" @onclick="OnCancel"></button>
+            </div>
+            <div class="modal-body">
+                <div class="rental-summary mb-3">
+                    <h6>Current Rental Details:</h6>
+                    <p><strong>Car:</strong> @Rental.CarName</p>
+                    <p><strong>Customer:</strong> @Rental.UserName</p>
+                    <p><strong>Current Due Date:</strong> @Rental.FormattedReturnDueDate</p>
+                    @if (Rental.RemainingDays > 0)
+                    {
+                        <p><strong>Days Remaining:</strong> @Rental.RemainingDays</p>
+                    }
+                    else if (Rental.IsOverdue)
+                    {
+                        <p class="text-danger"><strong>Overdue:</strong> @Rental.OverdueDays day@(Rental.OverdueDays != 1 ? "s" : "")</p>
+                    }
+                </div>
+
+                <form>
+                    <div class="mb-3">
+                        <label for="additionalDays" class="form-label">Additional Days <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="additionalDays"
+                               @bind="model.AdditionalDays" min="1" max="30" required>
+                        <div class="form-text">Maximum 30 additional days allowed.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">Reason for Extension (Optional)</label>
+                        <textarea class="form-control" id="reason" rows="3"
+                                  @bind="model.Reason" placeholder="Explain why the rental needs to be extended..."></textarea>
+                    </div>
+
+                    @if (model.AdditionalDays > 0 && Rental.ReturnDueDate.HasValue)
+                    {
+                        var newDueDate = Rental.ReturnDueDate.Value.AddDays(model.AdditionalDays);
+                        var additionalCost = (Rental.DailyRate ?? 0) * model.AdditionalDays;
+                        <div class="alert alert-info">
+                            <strong>New Due Date:</strong> @newDueDate.ToString("MMM dd, yyyy")<br>
+                            <strong>Additional Cost:</strong> @additionalCost.ToString("N0") TND
+                        </div>
+                    }
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="OnCancel">Cancel</button>
+                <button type="button" class="btn btn-warning" @onclick="HandleConfirm" disabled="@(!IsValid)">
+                    <i class="fa fa-plus"></i> Extend Rental
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CarRentalDto Rental { get; set; }
+    [Parameter] public EventCallback<ExtendRentalDto> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private ExtendRentalDto model = new();
+
+    private bool IsValid => model.AdditionalDays > 0 && model.AdditionalDays <= 30;
+
+    private async Task HandleConfirm()
+    {
+        if (IsValid)
+        {
+            await OnConfirm.InvokeAsync(model);
+        }
+    }
+}

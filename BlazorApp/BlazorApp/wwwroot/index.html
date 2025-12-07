@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BlazorApp</title>
+    <base href="/" />
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="images/logo.png">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome 6 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Slick Carousel -->
+    <link rel="stylesheet" href="css/slick.css" />
+    <link rel="stylesheet" href="css/slick-theme.css" />
+
+    <!-- nouislider -->
+    <link rel="stylesheet" href="css/nouislider.min.css" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/site.css" />
+    <link rel="stylesheet" href="css/custom-theme.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link href="BlazorApp.styles.css" rel="stylesheet" />
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- FullCalendar CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <!-- jQuery (required for main.js) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Bootstrap JS Bundle (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Carousel control function -->
+    <script>
+        window.goToCarouselSlide = function(carouselId, slideIndex) {
+            try {
+                console.log('goToCarouselSlide called:', carouselId, slideIndex);
+                var carouselElement = document.getElementById(carouselId);
+                if (!carouselElement) {
+                    console.error('Carousel element not found:', carouselId);
+                    return;
+                }
+
+                // Check if Bootstrap is available
+                if (typeof bootstrap === 'undefined' || !bootstrap.Carousel) {
+                    console.error('Bootstrap Carousel is not available');
+                    return;
+                }
+
+                var carousel = bootstrap.Carousel.getInstance(carouselElement);
+                if (!carousel) {
+                    console.log('Creating new carousel instance');
+                    carousel = new bootstrap.Carousel(carouselElement, {
+                        interval: false,
+                        wrap: true
+                    });
+                }
+                console.log('Navigating to slide:', slideIndex);
+                carousel.to(slideIndex);
+            } catch (error) {
+                console.error('Error in goToCarouselSlide:', error);
+            }
+        };
+    </script>
+
+    <!-- Slick Carousel -->
+    <script src="js/slick.min.js"></script>
+
+    <!-- nouislider -->
+    <script src="js/nouislider.min.js"></script>
+
+    <!-- jQuery zoom -->
+    <script src="js/jquery.zoom.min.js"></script>
+
+    <!-- FullCalendar JS -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+
+    <!-- Stripe.js -->
+    <script src="https://js.stripe.com/v3/"></script>
+
+    <!-- Custom JavaScript -->
+    <script src="js/main.js"></script>
+    <script src="js/site.js"></script>
+    <script src="js/CustomScript.js"></script>
+    <script src="js/analytics-charts.js"></script>
+    <script src="js/analytics-export.js"></script>
+
+    <!-- Live Updates -->
+    <script>
+        // Global functions to be called from Blazor
+        window.updateCartBadge = function(count) {
+            $('#cart-count').text(count > 0 ? count : 0);
+            $('#cart-count').show();
+        };
+
+        window.updateMessageBadge = function(count) {
+            $('#unread-count').text(count > 0 ? count : 0);
+            if (count > 0) {
+                $('#unread-count').show();
+            } else {
+                $('#unread-count').hide();
+            }
+        };
+
+        window.updateCompareBadge = function(count) {
+            $('#compare-count').text(count > 0 ? count : 0);
+            if (count > 0) {
+                $('#compare-count').show();
+            } else {
+                $('#compare-count').hide();
+            }
+        };
+
+        // Legacy localStorage support for cart count
+        $(document).ready(function() {
+            // Listen for storage events (cart changes in other tabs)
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'cart_count') {
+                    var cartCount = localStorage.getItem('cart_count') || 0;
+                    $('#cart-count').text(cartCount > 0 ? cartCount : 0);
+                    $('#cart-count').show();
+                }
+            });
+
+            // Initial cart count display
+            var cartCount = localStorage.getItem('cart_count') || 0;
+            $('#cart-count').text(cartCount > 0 ? cartCount : 0);
+            $('#cart-count').show();
+        });
+
+        // Stripe Payment Functions
+        let stripe = null;
+        let elements = null;
+        let cardElement = null;
+        let currentPaymentIntentId = null;
+        let stripeError = null;
+
+        window.checkElementExists = function(elementId) {
+            return document.getElementById(elementId) !== null;
+        };
+
+        window.initializeStripe = function(publishableKey) {
+            try {
+                if (typeof Stripe === 'undefined') {
+                    console.error('Stripe.js is not loaded');
+                    return;
+                }
+
+                stripe = Stripe(publishableKey);
+                elements = stripe.elements();
+
+                // Create card element
+                cardElement = elements.create('card', {
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#32325d',
+                            fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                            '::placeholder': {
+                                color: '#aab7c4'
+                            }
+                        },
+                        invalid: {
+                            color: '#fa755a',
+                            iconColor: '#fa755a'
+                        }
+                    }
+                });
+
+                // Mount card element - wait a bit if element doesn't exist yet
+                var cardElementContainer = document.getElementById('stripe-card-element');
+                if (!cardElementContainer) {
+                    console.warn('Stripe card element container not found, retrying...');
+                    setTimeout(function() {
+                        cardElementContainer = document.getElementById('stripe-card-element');
+                        if (cardElementContainer) {
+                            mountCardElement();
+                        }
+                    }, 200);
+                    return;
+                }
+                
+                mountCardElement();
+                
+                function mountCardElement() {
+                    try {
+                        // Clear any existing content
+                        var container = document.getElementById('stripe-card-element');
+                        if (container) {
+                            // Clear placeholder text
+                            container.innerHTML = '';
+                            container.style.display = 'block';
+                            container.style.minHeight = '50px';
+                            
+                            // Mount the card element
+                            cardElement.mount('#stripe-card-element');
+                            console.log('Stripe card element mounted successfully');
+
+                            // Handle real-time validation errors
+                            cardElement.on('change', function(event) {
+                                var displayError = document.getElementById('stripe-card-errors');
+                                if (displayError) {
+                                    if (event.error) {
+                                        displayError.textContent = event.error.message;
+                                        displayError.style.display = 'block';
+                                    } else {
+                                        displayError.textContent = '';
+                                        displayError.style.display = 'none';
+                                    }
+                                }
+                            });
+                            
+                            // Handle focus events
+                            cardElement.on('focus', function() {
+                                console.log('Card element focused');
+                            });
+                        } else {
+                            console.error('Stripe card element container not found');
+                        }
+                    } catch (error) {
+                        console.error('Error mounting Stripe card element:', error);
+                    }
+                }
+            } catch (error) {
+                console.error('Error initializing Stripe:', error);
+            }
+        };
+
+        window.destroyStripe = function() {
+            if (cardElement) {
+                cardElement.unmount();
+                cardElement = null;
+            }
+            elements = null;
+            stripe = null;
+            currentPaymentIntentId = null;
+        };
+
+        window.confirmStripePayment = async function(clientSecret) {
+            try {
+                if (!stripe || !cardElement) {
+                    console.error('Stripe not initialized');
+                    return false;
+                }
+
+                var displayError = document.getElementById('stripe-card-errors');
+                if (displayError) {
+                    displayError.textContent = '';
+                }
+
+                // Get customer details from form
+                var firstName = document.querySelector('input[name="FirstName"], input[placeholder*="First"]')?.value || '';
+                var lastName = document.querySelector('input[name="LastName"], input[placeholder*="Last"]')?.value || '';
+                var email = document.querySelector('input[type="email"], input[name="Email"]')?.value || '';
+
+                // Confirm payment with Stripe
+                const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+                    payment_method: {
+                        card: cardElement,
+                        billing_details: {
+                            name: (firstName + ' ' + lastName).trim() || 'Customer',
+                            email: email || undefined
+                        }
+                    }
+                });
+
+                if (error) {
+                    stripeError = error.message;
+                    if (displayError) {
+                        displayError.textContent = error.message;
+                        displayError.style.display = 'block';
+                    }
+                    console.error('Stripe payment error:', error);
+                    return false;
+                }
+                
+                stripeError = null; // Clear error on success
+
+                if (paymentIntent && paymentIntent.status === 'succeeded') {
+                    currentPaymentIntentId = paymentIntent.id;
+                    console.log('Payment succeeded:', paymentIntent.id);
+                    return true;
+                }
+
+                console.warn('Payment intent status:', paymentIntent?.status);
+                return false;
+            } catch (error) {
+                console.error('Error confirming payment:', error);
+                var displayError = document.getElementById('stripe-card-errors');
+                if (displayError) {
+                    displayError.textContent = 'Payment failed: ' + error.message;
+                }
+                return false;
+            }
+        };
+
+        window.getPaymentIntentId = function() {
+            return currentPaymentIntentId || '';
+        };
+
+        window.getStripeError = function() {
+            return stripeError || null;
+        };
+
+        // FullCalendar initialization for Admin Rental Dashboard
+        window.initializeRentalCalendar = function(events) {
+            var calendarEl = document.getElementById('calendar-container');
+            if (!calendarEl) return;
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                events: events.map(function(e) {
+                    return {
+                        title: e.title,
+                        start: e.start,
+                        end: e.end,
+                        color: e.color,
+                        extendedProps: {
+                            rentalId: e.rentalId,
+                            status: e.status
+                        }
+                    };
+                }),
+                eventClick: function(info) {
+                    if (info.event.extendedProps.rentalId) {
+                        window.location.href = '/rental/' + info.event.extendedProps.rentalId;
+                    }
+                },
+                height: 'auto'
+            });
+            calendar.render();
+        };
+
+        // FullCalendar initialization for User My Rentals
+        window.initializeMyRentalCalendar = function(events) {
+            var calendarEl = document.getElementById('myRentalCalendar');
+            if (!calendarEl) return;
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listMonth'
+                },
+                events: events.map(function(e) {
+                    return {
+                        title: e.title,
+                        start: e.start,
+                        end: e.end,
+                        color: e.color,
+                        extendedProps: {
+                            rentalId: e.rentalId,
+                            status: e.status
+                        }
+                    };
+                }),
+                eventClick: function(info) {
+                    if (info.event.extendedProps.rentalId) {
+                        window.location.href = '/rental/' + info.event.extendedProps.rentalId;
+                    }
+                },
+                height: 'auto'
+            });
+            calendar.render();
+        };
+
+        // FullCalendar initialization for Seller Rental Management
+        window.initializeSellerRentalCalendar = function(events) {
+            var calendarEl = document.getElementById('sellerRentalCalendar');
+            if (!calendarEl) return;
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listMonth'
+                },
+                events: events.map(function(e) {
+                    return {
+                        title: e.title,
+                        start: e.start,
+                        end: e.end,
+                        color: e.color,
+                        extendedProps: {
+                            rentalId: e.rentalId,
+                            status: e.status
+                        }
+                    };
+                }),
+                eventClick: function(info) {
+                    if (info.event.extendedProps.rentalId) {
+                        window.location.href = '/rental/' + info.event.extendedProps.rentalId;
+                    }
+                },
+                height: 'auto'
+            });
+            calendar.render();
+        };
+    </script>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+
+</html>

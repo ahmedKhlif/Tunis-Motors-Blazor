@@ -1,0 +1,236 @@
+@page "/delete-listing/{id:int}"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize]
+@inject ICarListingService CarListingService
+@inject NavigationManager NavigationManager
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="fa fa-trash-alt me-2"></i>Delete Car Listing</h4>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @errorMessage
+                            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                        </div>
+                    }
+
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading listing...</p>
+                        </div>
+                    }
+                    else if (listing != null)
+                    {
+                        <div class="alert alert-warning">
+                            <i class="fa fa-exclamation-triangle me-2"></i>
+                            <strong>Warning:</strong> This action cannot be undone. Deleting this listing will permanently remove it from the marketplace.
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 text-center mb-3">
+                                @if (!string.IsNullOrEmpty(listing.Image))
+                                {
+                                    <img src="/images/@listing.Image" alt="@listing.Name" class="img-fluid rounded" />
+                                }
+                                else
+                                {
+                                    <div class="bg-light d-flex align-items-center justify-content-center rounded" style="height: 200px;">
+                                        <i class="fa fa-car fa-3x text-muted"></i>
+                                    </div>
+                                }
+                            </div>
+                            <div class="col-md-8">
+                                <dl class="row">
+                                    <dt class="col-sm-4">Car Name:</dt>
+                                    <dd class="col-sm-8">@listing.Name</dd>
+
+                                    <dt class="col-sm-4">Brand:</dt>
+                                    <dd class="col-sm-8">@listing.Brand</dd>
+
+                                    <dt class="col-sm-4">Price:</dt>
+                                    <dd class="col-sm-8">@listing.Price.ToString("N0") TND</dd>
+
+                                    <dt class="col-sm-4">Year:</dt>
+                                    <dd class="col-sm-8">@listing.Year</dd>
+
+                                    <dt class="col-sm-4">Status:</dt>
+                                    <dd class="col-sm-8">
+                                        @if (listing.IsApproved)
+                                        {
+                                            <span class="badge bg-success">Approved</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning">Pending Approval</span>
+                                        }
+                                    </dd>
+
+                                    <dt class="col-sm-4">Created:</dt>
+                                    <dd class="col-sm-8">@listing.CreatedAt.ToString("MMM dd, yyyy HH:mm")</dd>
+                                </dl>
+                            </div>
+                        </div>
+
+                        <hr />
+
+                        <div class="d-flex justify-content-between">
+                            <a href="/my-listings" class="btn btn-outline-secondary">
+                                <i class="fa fa-arrow-left me-2"></i>Cancel
+                            </a>
+
+                            <button class="btn btn-danger" @onclick="ConfirmDelete" disabled="@isDeleting">
+                                @if (isDeleting)
+                                {
+                                    <text><span class="spinner-border spinner-border-sm me-2" role="status"></span>Deleting...</text>
+                                }
+                                else
+                                {
+                                    <text><i class="fa fa-trash-alt me-2"></i>Delete Listing</text>
+                                }
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <i class="fa fa-exclamation-triangle me-2"></i>Listing not found or you don't have permission to delete it.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Delete Dialog -->
+<ConfirmDialog IsVisible="@showDeleteDialog"
+               Title="Delete Listing"
+               Message="@deleteDialogMessage"
+               ConfirmText="Delete"
+               CancelText="Cancel"
+               Type="ConfirmDialog.DialogType.Danger"
+               OnConfirm="@OnDeleteConfirmed"
+               OnCancel="@OnDeleteCancelled" />
+
+<!-- Alert Dialog -->
+<AlertDialog IsVisible="@showAlert"
+             Title="@alertTitle"
+             Message="@alertMessage"
+             Type="@alertType"
+             OnClose="@CloseAlert" />
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private CarListingDto listing;
+    private bool isLoading = true;
+    private bool isDeleting = false;
+    private string errorMessage = "";
+    private bool showDeleteDialog = false;
+    private string deleteDialogMessage = "";
+    private bool showAlert = false;
+    private string alertTitle = "";
+    private string alertMessage = "";
+    private AlertDialog.AlertType alertType = AlertDialog.AlertType.Info;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadListing();
+    }
+
+    private async Task LoadListing()
+    {
+        try
+        {
+            isLoading = true;
+            listing = await CarListingService.GetListingByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load listing.";
+            Console.WriteLine($"Load listing error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ConfirmDelete()
+    {
+        deleteDialogMessage = $"Are you sure you want to delete the listing '{listing.Name}'? This action cannot be undone.";
+        showDeleteDialog = true;
+    }
+
+    private async Task OnDeleteConfirmed()
+    {
+        await DeleteListing();
+    }
+
+    private void OnDeleteCancelled()
+    {
+        showDeleteDialog = false;
+    }
+
+    private async Task DeleteListing()
+    {
+        isDeleting = true;
+        errorMessage = "";
+
+        try
+        {
+            var result = await CarListingService.DeleteListingAsync(Id);
+            if (result)
+            {
+                alertTitle = "Success";
+                alertMessage = "Listing deleted successfully!";
+                alertType = AlertDialog.AlertType.Success;
+                showAlert = true;
+                // Navigate after a short delay
+                await Task.Delay(1500);
+                NavigationManager.NavigateTo("/my-listings");
+            }
+            else
+            {
+                errorMessage = "Failed to delete listing.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Delete listing error: {ex.Message}");
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private void ShowAlert(string title, string message, AlertDialog.AlertType type)
+    {
+        alertTitle = title;
+        alertMessage = message;
+        alertType = type;
+        showAlert = true;
+    }
+
+    private void CloseAlert()
+    {
+        showAlert = false;
+    }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; }
+}

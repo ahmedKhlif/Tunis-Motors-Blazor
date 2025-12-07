@@ -1,0 +1,75 @@
+@inject NavigationManager Navigation
+
+<div class="section" style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-6 col-md-8">
+                <div class="text-center" style="padding: 60px 40px; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);">
+                    <!-- Access Denied Icon -->
+                    <div class="mb-4" style="position: relative;">
+                        <i class="fa fa-shield-alt" style="font-size: 120px; color: #dc2626; animation: pulse 2s ease-in-out infinite;"></i>
+                        <i class="fa fa-lock" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; color: white;"></i>
+                    </div>
+
+                    <!-- Title -->
+                    <h1 style="color: #1f2937; font-size: 36px; margin-bottom: 20px; font-weight: 700;">Access Denied</h1>
+                    <p style="color: #6b7280; font-size: 18px; margin-bottom: 15px; font-weight: 500;">403 - Forbidden</p>
+
+                    <!-- Description -->
+                    <p class="text-muted mb-4" style="font-size: 16px; line-height: 1.6;">
+                        You don't have permission to access this resource.
+                        This area is restricted to authorized users with specific roles.
+                    </p>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex justify-content-center gap-3 flex-wrap mb-4">
+                        <button @onclick="GoHome" class="btn btn-danger" style="padding: 14px 32px; font-weight: 600;">
+                            <i class="fa fa-home me-2"></i>Go to Homepage
+                        </button>
+                        <button @onclick="GoBack" class="btn btn-secondary" style="padding: 14px 32px; font-weight: 600;">
+                            <i class="fa fa-arrow-left me-2"></i>Go Back
+                        </button>
+                    </div>
+
+                    <!-- Additional Info -->
+                    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b; padding: 20px; border-radius: 10px;">
+                        <p style="color: #92400e; font-size: 14px; margin: 0;">
+                            <i class="fa fa-info-circle me-2" style="color: #f59e0b;"></i>
+                            If you believe this is an error, please contact our support team or administrator for assistance.
+                        </p>
+                    </div>
+
+                    <!-- Footer -->
+                    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                        <p style="color: #9ca3af; font-size: 14px; margin: 0;">
+                            &copy; 2024 <span style="color: #dc2626; font-weight: 700;">Tunisia Motors</span>. All rights reserved.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @@keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+</style>
+
+@code {
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/", true);
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/", true);
+    }
+}

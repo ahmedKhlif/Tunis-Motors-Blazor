@@ -1,0 +1,453 @@
+@page "/profile"
+@page "/profile/{UserId}"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize]
+@inject IUserService UserService
+@inject IAuthService AuthService
+@inject NavigationManager NavManager
+
+<div class="container-fluid py-5">
+    <div class="container">
+        <!-- Header Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex align-items-center mb-4">
+                    <div class="me-3">
+                        <div class="avatar-circle bg-primary text-white" style="width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px;">
+                            <i class="fa fa-user"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h1 class="display-6 mb-0">@(GetDisplayName())</h1>
+                        <p class="text-muted mb-0">@viewedUser?.Email</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Profile Information -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fa fa-user me-2"></i>@(isViewingOtherUser ? "User Profile" : "My Profile")</h5>
+                        @if (!isEditing && !isViewingOtherUser)
+                        {
+                            <button class="btn btn-sm btn-light" @onclick="() => isEditing = true">
+                                <i class="fa fa-edit me-1"></i>Edit
+                            </button>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @if (!isEditing || isViewingOtherUser)
+                        {
+                            <div class="row mb-4">
+                                <div class="col-md-6 mb-3">
+                                    <p class="text-muted small mb-1">First Name</p>
+                                    <p class="h6">
+                                        @if (string.IsNullOrEmpty(userProfile?.FirstName))
+                                        {
+                                            <span class="text-muted">Not provided</span>
+                                        }
+                                        else
+                                        {
+                                            @userProfile.FirstName
+                                        }
+                                    </p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <p class="text-muted small mb-1">Last Name</p>
+                                    <p class="h6">
+                                        @if (string.IsNullOrEmpty(userProfile?.LastName))
+                                        {
+                                            <span class="text-muted">Not provided</span>
+                                        }
+                                        else
+                                        {
+                                            @userProfile.LastName
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="row mb-4">
+                                <div class="col-md-6 mb-3">
+                                    <p class="text-muted small mb-1"><i class="fa fa-phone me-1"></i>Phone</p>
+                                    <p class="h6">
+                                        @if (string.IsNullOrEmpty(userProfile?.PhoneNumber))
+                                        {
+                                            <span class="text-muted">Not provided</span>
+                                        }
+                                        else
+                                        {
+                                            @userProfile.PhoneNumber
+                                        }
+                                    </p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <p class="text-muted small mb-1"><i class="fa fa-calendar me-1"></i>Date of Birth</p>
+                                    <p class="h6">
+                                        @if (userProfile?.DateOfBirth == null)
+                                        {
+                                            <span class="text-muted">Not provided</span>
+                                        }
+                                        else
+                                        {
+                                            @userProfile.DateOfBirth?.ToString("MMMM dd, yyyy")
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="row mb-4">
+                                <div class="col-12 mb-3">
+                                    <p class="text-muted small mb-1"><i class="fa fa-map-marker me-1"></i>Address</p>
+                                    <p class="h6">
+                                        @if (string.IsNullOrEmpty(userProfile?.Address) && string.IsNullOrEmpty(userProfile?.City) && string.IsNullOrEmpty(userProfile?.Country))
+                                        {
+                                            <span class="text-muted">Not provided</span>
+                                        }
+                                        else
+                                        {
+                                            @userProfile?.Address @if (!string.IsNullOrEmpty(userProfile?.City)) { <span>, @userProfile.City</span> } @if (!string.IsNullOrEmpty(userProfile?.Country)) { <span>, @userProfile.Country</span> }
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-12">
+                                    <p class="text-muted small mb-1"><i class="fa fa-comment me-1"></i>Bio</p>
+                                    <p class="h6">
+                                        @if (string.IsNullOrEmpty(userProfile?.Bio))
+                                        {
+                                            <span class="text-muted">Not provided</span>
+                                        }
+                                        else
+                                        {
+                                            @userProfile.Bio
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <form @onsubmit="SaveProfile">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">First Name</label>
+                                        <input type="text" class="form-control" @bind="updateModel.FirstName" placeholder="Enter first name" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Last Name</label>
+                                        <input type="text" class="form-control" @bind="updateModel.LastName" placeholder="Enter last name" />
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold"><i class="fa fa-phone me-1"></i>Phone</label>
+                                        <input type="tel" class="form-control" @bind="updateModel.PhoneNumber" placeholder="+216 XX XXX XXXX" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold"><i class="fa fa-calendar me-1"></i>Date of Birth</label>
+                                        <input type="date" class="form-control" @bind="updateModel.DateOfBirth" />
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold"><i class="fa fa-map-marker me-1"></i>Address</label>
+                                    <input type="text" class="form-control" @bind="updateModel.Address" placeholder="Street address" />
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">City</label>
+                                        <input type="text" class="form-control" @bind="updateModel.City" placeholder="City" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-semibold">Country</label>
+                                        <input type="text" class="form-control" @bind="updateModel.Country" placeholder="Country" />
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold"><i class="fa fa-comment me-1"></i>Bio</label>
+                                    <textarea class="form-control" @bind="updateModel.Bio" placeholder="Tell us about yourself" rows="4"></textarea>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="button" class="btn btn-secondary" @onclick="() => isEditing = false">
+                                        <i class="fa fa-times me-1"></i>Cancel
+                                    </button>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fa fa-save me-1"></i>Save Changes
+                                    </button>
+                                </div>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Information Sidebar -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fa fa-lock me-2"></i>Account Information</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (currentUser != null)
+                        {
+                            <div class="mb-3">
+                                <p class="text-muted small mb-1">Username</p>
+                                <p class="h6 font-monospace">@viewedUser.UserName</p>
+                            </div>
+                            <div class="mb-3">
+                                <p class="text-muted small mb-1">Email Address</p>
+                                <p class="h6 font-monospace">@viewedUser.Email</p>
+                            </div>
+                            <div class="mb-3">
+                                <p class="text-muted small mb-1">Account Role(s)</p>
+                                <div>
+                                    @if (viewedUser.Roles != null && viewedUser.Roles.Count > 0)
+                                    {
+                                        @foreach (var role in viewedUser.Roles)
+                                        {
+                                            <span class="badge bg-primary me-1">@role</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">User</span>
+                                    }
+                                </div>
+                            </div>
+                            @if (!isViewingOtherUser)
+                            {
+                                <hr />
+                                <button class="btn btn-warning w-100">
+                                    <i class="fa fa-key me-1"></i>Change Password
+                                </button>
+                            }
+                        }
+                    </div>
+                </div>
+
+                @if (!isViewingOtherUser)
+                {
+                    <!-- Quick Actions -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fa fa-bolt me-2"></i>Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="/my-orders" class="btn btn-outline-primary">
+                                    <i class="fa fa-shopping-bag me-2"></i>My Orders
+                                </a>
+                                <a href="/my-rentals" class="btn btn-outline-info">
+                                    <i class="fa fa-calendar me-2"></i>My Rentals
+                                </a>
+                                <a href="/my-listings" class="btn btn-outline-success">
+                                    <i class="fa fa-car me-2"></i>My Listings
+                                </a>
+                                <a href="/wishlist" class="btn btn-outline-danger">
+                                    <i class="fa-regular fa-heart me-2"></i>My Wishlist
+                                </a>
+                                <a href="/messages" class="btn btn-outline-secondary">
+                                    <i class="fa fa-envelope me-2"></i>My Messages
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fa fa-shield-alt me-2"></i>Account Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <p class="text-muted small mb-1">Email Verification</p>
+                            <p class="h6">
+                                <i class="fa fa-check-circle text-success me-1"></i>Verified
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-muted small mb-1">Account Status</p>
+                            <p class="h6">
+                                <i class="fa fa-star text-success me-1"></i>Active
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? UserId { get; set; }
+    
+    private UserDto currentUser;
+    private UserDto viewedUser; // The user whose profile is being viewed
+    private UserProfileDto userProfile;
+    private UpdateUserProfileDto updateModel = new();
+    private bool isEditing = false;
+    private bool isLoading = true;
+    private bool isViewingOtherUser = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Console.WriteLine($"[Profile] Loading user data... UserId param: {UserId}");
+            currentUser = await AuthService.GetCurrentUserAsync();
+            
+            // Check if viewing another user's profile
+            isViewingOtherUser = !string.IsNullOrEmpty(UserId) && UserId != currentUser?.Id;
+            
+            if (isViewingOtherUser)
+            {
+                // Load other user's profile
+                Console.WriteLine($"[Profile] Loading profile for user: {UserId}");
+                var otherUser = await UserService.GetUserByIdAsync(UserId);
+                if (otherUser != null)
+                {
+                    viewedUser = otherUser;
+                    userProfile = otherUser.Profile;
+                    Console.WriteLine($"[Profile] Other user profile loaded: {otherUser.Email}");
+                }
+            }
+            else
+            {
+                // Load current user's profile
+                Console.WriteLine($"[Profile] CurrentUser: {currentUser?.Email}");
+                Console.WriteLine($"[Profile] Profile exists: {currentUser?.Profile != null}");
+                
+                viewedUser = currentUser; // Viewing own profile
+                if (currentUser != null)
+                {
+                    userProfile = currentUser.Profile;
+                    if (userProfile != null)
+                    {
+                        Console.WriteLine($"[Profile] Profile loaded: {userProfile.FirstName} {userProfile.LastName}");
+                        updateModel = new UpdateUserProfileDto
+                        {
+                            FirstName = userProfile.FirstName,
+                            LastName = userProfile.LastName,
+                            PhoneNumber = userProfile.PhoneNumber,
+                            DateOfBirth = userProfile.DateOfBirth,
+                            Address = userProfile.Address,
+                            City = userProfile.City,
+                            Country = userProfile.Country,
+                            Bio = userProfile.Bio
+                        };
+                    }
+                    else
+                    {
+                        Console.WriteLine("[Profile] User profile is null - initializing empty profile");
+                        // Initialize empty profile if not exists
+                        userProfile = new UserProfileDto 
+                        { 
+                            FirstName = string.Empty,
+                            LastName = string.Empty,
+                            PhoneNumber = string.Empty,
+                            Address = string.Empty,
+                            City = string.Empty,
+                            Country = string.Empty,
+                            Bio = string.Empty
+                        };
+                        updateModel = new UpdateUserProfileDto
+                        {
+                            FirstName = string.Empty,
+                            LastName = string.Empty,
+                            PhoneNumber = string.Empty,
+                            DateOfBirth = null,
+                            Address = string.Empty,
+                            City = string.Empty,
+                            Country = string.Empty,
+                            Bio = string.Empty
+                        };
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[Profile] CurrentUser is null");
+                }
+            }
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Profile] Error: {ex.Message}");
+            Console.WriteLine($"[Profile] Stack: {ex.StackTrace}");
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        try
+        {
+            var success = await UserService.UpdateProfileAsync(updateModel);
+            if (success)
+            {
+                isEditing = false;
+                // Reload user data to get updated profile
+                currentUser = await AuthService.GetCurrentUserAsync();
+                userProfile = currentUser?.Profile;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Profile] Error saving profile: {ex.Message}");
+        }
+    }
+
+    private async Task RefreshProfile()
+    {
+        try
+        {
+            isLoading = true;
+            currentUser = await AuthService.GetCurrentUserAsync();
+            userProfile = currentUser?.Profile;
+            if (userProfile != null)
+            {
+                updateModel = new UpdateUserProfileDto
+                {
+                    FirstName = userProfile.FirstName,
+                    LastName = userProfile.LastName,
+                    PhoneNumber = userProfile.PhoneNumber,
+                    DateOfBirth = userProfile.DateOfBirth,
+                    Address = userProfile.Address,
+                    City = userProfile.City,
+                    Country = userProfile.Country,
+                    Bio = userProfile.Bio
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing profile: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetDisplayName()
+    {
+        if (userProfile != null && (!string.IsNullOrEmpty(userProfile.FirstName) || !string.IsNullOrEmpty(userProfile.LastName)))
+        {
+            return $"{userProfile.FirstName} {userProfile.LastName}".Trim();
+        }
+        return currentUser?.UserName ?? "User Profile";
+    }
+}

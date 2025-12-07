@@ -1,0 +1,603 @@
+@page "/checkout"
+@using BlazorApp.Models
+@using BlazorApp.Services
+@using System.Text.Json
+@using System.ComponentModel.DataAnnotations
+@inject IOrderService OrderService
+@inject ICartService CartService
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+@implements IAsyncDisposable
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Checkout</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/cart">Shopping Cart</a></li>
+                    <li class="active">Checkout</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+<div class="container mt-5">
+    <h1><i class="fa fa-credit-card"></i> Checkout</h1>
+
+    <div class="row">
+        <!-- Order Summary -->
+        <div class="col-lg-4 order-lg-last">
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Order Summary</h5>
+                </div>
+                <div class="card-body">
+                    @if (cartItems != null && cartItems.Any())
+                    {
+                        <div class="order-items mb-3" style="max-height: 400px; overflow-y: auto;">
+                            @foreach (var item in cartItems)
+                            {
+                                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                    <div>
+                                        <p class="mb-0 font-weight-bold">@item.ProductName</p>
+                                        <small class="text-muted">Qty: @item.Quantity</small>
+                                    </div>
+                                    <span>@((item.Price * item.Quantity).ToString("N0")) TND</span>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <hr />
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal:</span>
+                        <span>@totalAmount.ToString("N0") TND</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Shipping:</span>
+                        <span>Free</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>Tax:</span>
+                        <span>0 TND</span>
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between" style="font-size: 1.2rem; font-weight: bold;">
+                        <span>Total:</span>
+                        <span class="text-danger">@totalAmount.ToString("N0") TND</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Checkout Form -->
+        <div class="col-lg-8">
+            <EditForm Model="@checkoutModel" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+
+                <!-- Billing Address -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fa fa-map-marker"></i> Billing Address</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">First Name *</label>
+                                <InputText class="form-control" @bind-Value="checkoutModel.FirstName" />
+                                <ValidationMessage For="@(() => checkoutModel.FirstName)" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Last Name *</label>
+                                <InputText class="form-control" @bind-Value="checkoutModel.LastName" />
+                                <ValidationMessage For="@(() => checkoutModel.LastName)" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Email *</label>
+                            <InputText type="email" class="form-control" @bind-Value="checkoutModel.Email" />
+                            <ValidationMessage For="@(() => checkoutModel.Email)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Phone *</label>
+                            <InputText class="form-control" @bind-Value="checkoutModel.Phone" placeholder="+216 XX XXX XXX" />
+                            <ValidationMessage For="@(() => checkoutModel.Phone)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Address *</label>
+                            <InputText class="form-control" @bind-Value="checkoutModel.Address" />
+                            <ValidationMessage For="@(() => checkoutModel.Address)" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">City *</label>
+                                <InputText class="form-control" @bind-Value="checkoutModel.City" />
+                                <ValidationMessage For="@(() => checkoutModel.City)" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Postal Code *</label>
+                                <InputText class="form-control" @bind-Value="checkoutModel.PostalCode" />
+                                <ValidationMessage For="@(() => checkoutModel.PostalCode)" />
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <InputCheckbox class="form-check-input" @bind-Value="checkoutModel.SameAsShipping" />
+                            <label class="form-check-label">
+                                Shipping address same as billing
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Shipping Address (if different) -->
+                @if (!checkoutModel.SameAsShipping)
+                {
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fa fa-truck"></i> Shipping Address</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">First Name *</label>
+                                    <InputText class="form-control" @bind-Value="checkoutModel.ShippingFirstName" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Last Name *</label>
+                                    <InputText class="form-control" @bind-Value="checkoutModel.ShippingLastName" />
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Address *</label>
+                                <InputText class="form-control" @bind-Value="checkoutModel.ShippingAddress" />
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">City *</label>
+                                    <InputText class="form-control" @bind-Value="checkoutModel.ShippingCity" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Postal Code *</label>
+                                    <InputText class="form-control" @bind-Value="checkoutModel.ShippingPostalCode" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Payment Method -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fa fa-credit-card"></i> Payment Method</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input type="radio" class="form-check-input" id="stripe" name="paymentMethod" value="stripe" checked="@(checkoutModel.PaymentMethod == "stripe")" @onchange="@(async (ChangeEventArgs e) => await OnPaymentMethodChanged((string)e.Value))" />
+                            <label class="form-check-label" for="stripe">
+                                <i class="fa fa-cc-stripe"></i> Credit/Debit Card (Stripe)
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="radio" class="form-check-input" id="bank" name="paymentMethod" value="bank" checked="@(checkoutModel.PaymentMethod == "bank")" @onchange="@(async (ChangeEventArgs e) => await OnPaymentMethodChanged((string)e.Value))" />
+                            <label class="form-check-label" for="bank">
+                                <i class="fa fa-university"></i> Bank Transfer
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input type="radio" class="form-check-input" id="cash" name="paymentMethod" value="cash" checked="@(checkoutModel.PaymentMethod == "cash")" @onchange="@(async (ChangeEventArgs e) => await OnPaymentMethodChanged((string)e.Value))" />
+                            <label class="form-check-label" for="cash">
+                                <i class="fa fa-money"></i> Cash on Delivery
+                            </label>
+                        </div>
+
+                        <!-- Stripe Card Element -->
+                        @if (checkoutModel.PaymentMethod == "stripe")
+                        {
+                            <div class="alert alert-info mt-3">
+                                <i class="fa fa-info-circle me-2"></i>
+                                <strong>Note:</strong> Payments are processed in USD. Your card will be charged the equivalent amount.
+                            </div>
+                            <div class="mt-3">
+                                <label class="form-label">Card Details *</label>
+                                <div id="stripe-card-element" class="p-3 border rounded" style="background: #fff; min-height: 50px;">
+                                    <!-- Stripe Elements will create form elements here -->
+                                </div>
+                                <div id="stripe-card-errors" class="text-danger mt-2 small" role="alert" style="display: none;"></div>
+                                <small class="text-muted mt-2 d-block">
+                                    <i class="fa fa-lock me-1"></i> Your payment information is secure and encrypted
+                                </small>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Terms & Conditions -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="checkoutModel.AcceptTerms" />
+                            <label class="form-check-label">
+                                I agree to the <a href="#" target="_blank">Terms and Conditions</a> and <a href="#" target="_blank">Privacy Policy</a> *
+                            </label>
+                            <ValidationMessage For="@(() => checkoutModel.AcceptTerms)" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div class="mb-4">
+                    <button type="submit" class="btn btn-danger btn-lg w-100" disabled="@(isProcessing || cartItems.Count == 0)">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Processing...</span>
+                        }
+                        else
+                        {
+                            <span><i class="fa fa-lock"></i> Complete Purchase - @totalAmount.ToString("N0") TND</span>
+                        }
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+            </EditForm>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+<!-- /SECTION -->
+
+@code {
+    private CheckoutFormModel checkoutModel = new();
+    private List<CartItemDto> cartItems = new();
+    private decimal totalAmount = 0;
+    private string errorMessage = "";
+    private bool isProcessing = false;
+    private bool stripeInitialized = false;
+    private string stripePublishableKey = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is logged in
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            NavigationManager.NavigateTo("/login?returnUrl=/checkout");
+            return;
+        }
+
+        // Get Stripe publishable key from configuration
+        stripePublishableKey = Configuration["Stripe:PublishableKey"] ?? "";
+
+        // Pre-fill from current user profile
+        checkoutModel.Email = currentUser.Email;
+        checkoutModel.PaymentMethod = "stripe"; // Default to stripe
+
+        // Pre-fill billing address from user profile if available
+        if (currentUser.Profile != null)
+        {
+            checkoutModel.FirstName = currentUser.Profile.FirstName ?? "";
+            checkoutModel.LastName = currentUser.Profile.LastName ?? "";
+            checkoutModel.Phone = currentUser.Profile.PhoneNumber ?? "";
+            checkoutModel.Address = currentUser.Profile.Address ?? "";
+            checkoutModel.City = currentUser.Profile.City ?? "";
+            checkoutModel.ShippingFirstName = checkoutModel.FirstName;
+            checkoutModel.ShippingLastName = checkoutModel.LastName;
+            checkoutModel.ShippingAddress = checkoutModel.Address;
+            checkoutModel.ShippingCity = checkoutModel.City;
+        }
+
+        // Load cart from localStorage
+        await LoadCart();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && checkoutModel.PaymentMethod == "stripe" && !string.IsNullOrEmpty(stripePublishableKey))
+        {
+            await Task.Delay(300); // Wait for DOM to be fully rendered
+            await InitializeStripeAsync();
+        }
+        else if (!firstRender && checkoutModel.PaymentMethod == "stripe" && !stripeInitialized && !string.IsNullOrEmpty(stripePublishableKey))
+        {
+            // Re-initialize if payment method was changed to Stripe
+            await Task.Delay(100);
+            await InitializeStripeAsync();
+        }
+    }
+
+    private async Task OnPaymentMethodChanged(string method)
+    {
+        checkoutModel.PaymentMethod = method;
+        
+        if (method != "stripe")
+        {
+            await DestroyStripeAsync();
+        }
+        
+        StateHasChanged();
+        
+        // Wait for DOM to update, then initialize Stripe if needed
+        if (method == "stripe" && !string.IsNullOrEmpty(stripePublishableKey))
+        {
+            await Task.Delay(100); // Small delay to ensure DOM is updated
+            await InitializeStripeAsync();
+        }
+    }
+
+    private async Task InitializeStripeAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(stripePublishableKey))
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", "Stripe publishable key is not configured");
+                errorMessage = "Payment system not configured. Please contact support.";
+                return;
+            }
+
+            // Check if element exists before initializing - retry a few times
+            var elementExists = false;
+            for (int i = 0; i < 5; i++)
+            {
+                elementExists = await JSRuntime.InvokeAsync<bool>("checkElementExists", "stripe-card-element");
+                if (elementExists) break;
+                await Task.Delay(100); // Wait 100ms between retries
+            }
+            
+            if (elementExists)
+            {
+                await JSRuntime.InvokeVoidAsync("initializeStripe", stripePublishableKey);
+                await Task.Delay(200); // Wait for Stripe to mount
+                stripeInitialized = true;
+                await JSRuntime.InvokeVoidAsync("console.log", "Stripe initialized and card element mounted");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", "Stripe card element not found in DOM after retries");
+                errorMessage = "Payment form not ready. Please refresh the page.";
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", "Failed to initialize Stripe: " + ex.Message);
+            errorMessage = $"Failed to initialize payment form: {ex.Message}";
+        }
+    }
+
+    private async Task DestroyStripeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("destroyStripe");
+            stripeInitialized = false;
+        }
+        catch { }
+    }
+
+    private async Task LoadCart()
+    {
+        try
+        {
+            var response = await CartService.GetCartAsync();
+            if (response.Success && response.Data != null)
+            {
+                cartItems = response.Data.Items ?? new List<CartItemDto>();
+                totalAmount = response.Data.TotalAmount;
+            }
+            else
+            {
+                errorMessage = response.Message ?? "Your cart is empty. Please add items before checkout.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading cart: {ex.Message}";
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        try
+        {
+            isProcessing = true;
+            errorMessage = "";
+
+            if (cartItems.Count == 0)
+            {
+                throw new Exception("Your cart is empty");
+            }
+
+            // Validate form
+            if (string.IsNullOrWhiteSpace(checkoutModel.FirstName))
+                throw new Exception("First name is required");
+
+            if (string.IsNullOrWhiteSpace(checkoutModel.LastName))
+                throw new Exception("Last name is required");
+
+            if (string.IsNullOrWhiteSpace(checkoutModel.Address))
+                throw new Exception("Address is required");
+
+            if (!checkoutModel.AcceptTerms)
+                throw new Exception("You must accept the terms and conditions");
+
+            // Create order
+            var customerName = $"{checkoutModel.FirstName} {checkoutModel.LastName}";
+            var address = checkoutModel.SameAsShipping ? checkoutModel.Address : checkoutModel.ShippingAddress;
+
+            var createOrderModel = new CreateOrderDto
+            {
+                CustomerName = customerName,
+                Email = checkoutModel.Email,
+                Address = address,
+                PaymentMethod = checkoutModel.PaymentMethod,
+                Items = cartItems.Select(x => new CreateOrderItemDto
+                {
+                    ProductId = x.ProductId,
+                    ProductName = x.ProductName ?? "Unknown Product",
+                    Quantity = x.Quantity,
+                    Price = x.Price
+                }).ToList()
+            };
+
+            // Call API to create order
+            var order = await OrderService.CreateOrderAsync(createOrderModel);
+
+            if (order == null)
+                throw new Exception("Failed to create order");
+
+            // Handle payment based on method
+            if (checkoutModel.PaymentMethod.Equals("stripe", StringComparison.OrdinalIgnoreCase))
+            {
+                // Verify Stripe is initialized
+                if (!stripeInitialized)
+                {
+                    throw new Exception("Payment form not ready. Please wait a moment and try again.");
+                }
+
+                // Create payment intent
+                string clientSecret;
+                try
+                {
+                    clientSecret = await OrderService.CreatePaymentIntentAsync(order.Id);
+                    if (string.IsNullOrEmpty(clientSecret))
+                    {
+                        throw new Exception("Payment intent was created but no client secret was returned. Please try again.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log the full error for debugging
+                    await JSRuntime.InvokeVoidAsync("console.error", "Payment intent creation error: " + ex.ToString());
+                    throw new Exception($"Failed to create payment intent: {ex.Message}");
+                }
+                
+                // Confirm payment with Stripe
+                var paymentResult = await JSRuntime.InvokeAsync<bool>("confirmStripePayment", clientSecret);
+                
+                if (!paymentResult)
+                {
+                    var errorMsg = await JSRuntime.InvokeAsync<string>("getStripeError");
+                    throw new Exception(errorMsg ?? "Payment failed. Please check your card details and try again.");
+                }
+
+                // Get payment intent ID from JavaScript
+                var paymentIntentId = await JSRuntime.InvokeAsync<string>("getPaymentIntentId");
+                
+                if (string.IsNullOrEmpty(paymentIntentId))
+                {
+                    throw new Exception("Payment confirmation failed. Please try again.");
+                }
+                
+                // Process payment on backend
+                var paymentProcessed = await OrderService.ProcessPaymentAsync(order.Id, paymentIntentId);
+                
+                if (!paymentProcessed)
+                {
+                    throw new Exception("Payment processing failed. Please contact support.");
+                }
+
+                await JSRuntime.InvokeVoidAsync("console.log", "Stripe payment processed successfully for order: " + order.Id);
+            }
+            else
+            {
+                // For bank transfer and cash on delivery, order is already created with status "Pending"
+                await JSRuntime.InvokeVoidAsync("console.log", $"Order created with {checkoutModel.PaymentMethod} payment: " + order.Id);
+            }
+
+            // Clear cart after successful order creation
+            try
+            {
+                await CartService.ClearCartAsync();
+            }
+            catch (Exception ex)
+            {
+                await JSRuntime.InvokeVoidAsync("console.warn", "Failed to clear cart: " + ex.Message);
+            }
+            
+            // Clear local cart storage
+            await JSRuntime.InvokeVoidAsync("eval", "localStorage.removeItem('cart'); localStorage.setItem('cart_count', '0');");
+
+            // Redirect to confirmation
+            NavigationManager.NavigateTo($"/order-confirmation/{order.Id}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            await JSRuntime.InvokeVoidAsync("console.error", "Checkout error: " + ex.Message);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private void CalculateTotal()
+    {
+        totalAmount = cartItems.Sum(x => x.Price * x.Quantity);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (stripeInitialized)
+        {
+            await DestroyStripeAsync();
+        }
+    }
+
+
+    private class CheckoutFormModel
+    {
+        [Required(ErrorMessage = "First name is required")]
+        public string FirstName { get; set; }
+
+        [Required(ErrorMessage = "Last name is required")]
+        public string LastName { get; set; }
+
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        public string Email { get; set; }
+
+        [Required(ErrorMessage = "Phone is required")]
+        public string Phone { get; set; }
+
+        [Required(ErrorMessage = "Address is required")]
+        public string Address { get; set; }
+
+        public string City { get; set; }
+        public string PostalCode { get; set; }
+
+        public bool SameAsShipping { get; set; } = true;
+        public string ShippingFirstName { get; set; }
+        public string ShippingLastName { get; set; }
+        public string ShippingAddress { get; set; }
+        public string ShippingCity { get; set; }
+        public string ShippingPostalCode { get; set; }
+
+        public string PaymentMethod { get; set; } = "stripe";
+
+        [Required(ErrorMessage = "You must accept terms and conditions")]
+        public bool AcceptTerms { get; set; }
+    }
+}

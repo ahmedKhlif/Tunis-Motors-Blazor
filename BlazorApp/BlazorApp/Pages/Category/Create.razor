@@ -1,0 +1,144 @@
+@page "/admin/create-category"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject ICategoryService CategoryService
+@inject NavigationManager NavigationManager
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fa fa-plus-circle me-2"></i>Create New Category</h4>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            @successMessage
+                            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @errorMessage
+                            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                        </div>
+                    }
+
+                    <EditForm Model="categoryModel" OnValidSubmit="HandleCreateCategory" FormName="createCategoryForm" enctype="multipart/form-data">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger" />
+
+                        <div class="mb-3">
+                            <label for="categoryName" class="form-label">Category Name</label>
+                            <InputText id="categoryName" class="form-control" @bind-Value="categoryModel.CategoryName" placeholder="Enter category name" />
+                            <ValidationMessage For="() => categoryModel.CategoryName" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description (Optional)</label>
+                            <InputTextArea id="description" class="form-control" rows="3" @bind-Value="categoryModel.Description" placeholder="Enter category description" />
+                            <ValidationMessage For="() => categoryModel.Description" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="imageFile" class="form-label">Category Image (Optional)</label>
+                            <InputFile id="imageFile" class="form-control" OnChange="HandleFileSelected" accept=".jpg,.jpeg,.png,.gif" />
+                            <div class="form-text">Supported formats: JPG, PNG, GIF. Max size: 5MB</div>
+                            @if (!string.IsNullOrEmpty(selectedFileName))
+                            {
+                                <div class="mt-2">
+                                    <small class="text-success">Selected: @selectedFileName</small>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                                @if (isSubmitting)
+                                {
+                                    <text><span class="spinner-border spinner-border-sm me-2" role="status"></span>Creating...</text>
+                                }
+                                else
+                                {
+                                    <text><i class="fa fa-plus me-2"></i>Create Category</text>
+                                }
+                            </button>
+                            <a href="/admin/categories" class="btn btn-outline-secondary">
+                                <i class="fa fa-arrow-left me-2"></i>Back to Categories
+                            </a>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private CreateCategoryModel categoryModel = new();
+    private IBrowserFile selectedFile;
+    private string selectedFileName = "";
+    private string successMessage = "";
+    private string errorMessage = "";
+    private bool isSubmitting = false;
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        selectedFileName = selectedFile?.Name ?? "";
+    }
+
+    private async Task HandleCreateCategory()
+    {
+        isSubmitting = true;
+        errorMessage = "";
+        successMessage = "";
+
+        try
+        {
+            var categoryDto = new CategoryDto
+            {
+                CategoryName = categoryModel.CategoryName,
+                Description = categoryModel.Description
+            };
+            var result = await CategoryService.CreateCategoryAsync(categoryDto);
+            if (result != null)
+            {
+                successMessage = $"Category '{categoryModel.CategoryName}' created successfully!";
+                categoryModel = new CreateCategoryModel();
+                selectedFile = null;
+                selectedFileName = "";
+                await Task.Delay(1500);
+                NavigationManager.NavigateTo("/admin/categories");
+            }
+            else
+            {
+                errorMessage = "Failed to create category.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Create category error: {ex.Message}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    public class CreateCategoryModel
+    {
+        [Required(ErrorMessage = "Category name is required")]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Category name must be between 2 and 100 characters")]
+        public string CategoryName { get; set; } = "";
+
+        [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
+        public string Description { get; set; } = "";
+    }
+}

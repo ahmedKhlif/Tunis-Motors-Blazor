@@ -1,0 +1,981 @@
+@page "/order/details/{id:int}"
+@page "/order/{id:int}"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize]
+@inject IOrderService OrderService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Order Details</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    @if (isAdmin || isManager)
+                    {
+                        <li><a href="/admin">Dashboard</a></li>
+                        <li><a href="/admin/orders">Orders</a></li>
+                    }
+                    else
+                    {
+                        <li><a href="/profile/my-orders">My Orders</a></li>
+                    }
+                    <li class="active">Order #@Id</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading order details...</p>
+            </div>
+        }
+        else if (order != null)
+        {
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fa fa-check-circle me-2"></i>@successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fa fa-exclamation-circle me-2"></i>@errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                </div>
+            }
+
+            <!-- Order Header with Print Button -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <h2 class="section-title">
+                        <i class="fa fa-shopping-bag me-2"></i>Order #@order.Id
+                    </h2>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button class="btn btn-outline-primary" @onclick="PrintOrder" id="print-btn">
+                        <i class="fa fa-print me-2"></i>Print Invoice
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="GoBack" id="back-btn">
+                        <i class="fa fa-arrow-left me-2"></i>Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- Invoice Header (Visible in Print) -->
+            <div class="invoice-header print-only" style="display: none;">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h1 class="invoice-title">TUNIS MOTORS</h1>
+                        <p class="invoice-subtitle">INVOICE</p>
+                        <div class="invoice-company-info">
+                            <p><strong>Address:</strong> Tunis, Tunisia</p>
+                            <p><strong>Phone:</strong> +216 95 518 4</p>
+                            <p><strong>Email:</strong> contact@carecommerce.tn</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="invoice-number-box">
+                            <p class="invoice-label">INVOICE #</p>
+                            <p class="invoice-number">@order.Id</p>
+                        </div>
+                        <div class="invoice-date-box mt-3">
+                            <p class="invoice-label">DATE</p>
+                            <p class="invoice-date">@order.OrderDate.ToString("MMMM dd, yyyy")</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Order Details -->
+                <div class="col-lg-8">
+                    <!-- Order Information Card -->
+                    <div class="card shadow mb-4" id="order-details">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fa fa-info-circle me-2"></i>Order Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong><i class="fa fa-hashtag me-2"></i>Order Number:</strong> #@order.Id</p>
+                                    <p class="mb-2"><strong><i class="fa fa-calendar me-2"></i>Order Date:</strong> @order.OrderDate.ToString("MMMM dd, yyyy 'at' hh:mm tt")</p>
+                                    <p class="mb-2">
+                                        <strong><i class="fa fa-info-circle me-2"></i>Status:</strong>
+                                        <span class="badge @GetStatusBadgeClass(order.Status) ms-2">@order.Status</span>
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong><i class="fa fa-credit-card me-2"></i>Payment Method:</strong> 
+                                        <span class="badge bg-secondary">@order.PaymentMethod.ToUpper()</span>
+                                    </p>
+                                    <p class="mb-2"><strong><i class="fa fa-money-bill me-2"></i>Total Amount:</strong> 
+                                        <span class="text-success h5">@order.TotalAmount.ToString("N0") TND</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Status Timeline -->
+                            <hr />
+                            <h6 class="mb-3"><i class="fa fa-history me-2"></i>Order Status Timeline</h6>
+                            <div class="status-timeline">
+                                <div class="timeline-item @(IsStatusReached("Pending") ? "active" : "")">
+                                    <div class="timeline-marker @(IsStatusReached("Pending") ? "completed" : "")">
+                                        <i class="fa fa-clock"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <strong>Pending</strong>
+                                        @if (order.Status == "Pending")
+                                        {
+                                            <span class="badge bg-warning text-dark ms-2">Current</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="timeline-item @(IsStatusReached("Confirmed") ? "active" : "")">
+                                    <div class="timeline-marker @(IsStatusReached("Confirmed") ? "completed" : "")">
+                                        <i class="fa fa-check"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <strong>Confirmed</strong>
+                                        @if (order.Status == "Confirmed")
+                                        {
+                                            <span class="badge bg-info ms-2">Current</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="timeline-item @(IsStatusReached("Processing") ? "active" : "")">
+                                    <div class="timeline-marker @(IsStatusReached("Processing") ? "completed" : "")">
+                                        <i class="fa fa-cog"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <strong>Processing</strong>
+                                        @if (order.Status == "Processing")
+                                        {
+                                            <span class="badge bg-info ms-2">Current</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="timeline-item @(IsStatusReached("Shipped") ? "active" : "")">
+                                    <div class="timeline-marker @(IsStatusReached("Shipped") ? "completed" : "")">
+                                        <i class="fa fa-truck"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <strong>Shipped</strong>
+                                        @if (order.Status == "Shipped")
+                                        {
+                                            <span class="badge bg-primary ms-2">Current</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="timeline-item @(IsStatusReached("Delivered") ? "active" : "")">
+                                    <div class="timeline-marker @(IsStatusReached("Delivered") ? "completed" : "")">
+                                        <i class="fa fa-check-circle"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <strong>Delivered</strong>
+                                        @if (order.Status == "Delivered")
+                                        {
+                                            <span class="badge bg-success ms-2">Current</span>
+                                        }
+                                    </div>
+                                </div>
+                                @if (order.Status == "Cancelled")
+                                {
+                                    <div class="timeline-item active">
+                                        <div class="timeline-marker completed cancelled">
+                                            <i class="fa fa-times-circle"></i>
+                                        </div>
+                                        <div class="timeline-content">
+                                            <strong>Cancelled</strong>
+                                            <span class="badge bg-danger ms-2">Current</span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            <hr />
+
+                            <!-- Customer Information -->
+                            <h6 class="mb-3"><i class="fa fa-user me-2"></i>Customer Information</h6>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>Name:</strong> @order.CustomerName</p>
+                                    <p class="mb-2"><strong>Email:</strong> <a href="mailto:@order.Email">@order.Email</a></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>Delivery Address:</strong></p>
+                                    <p class="text-muted">@order.Address</p>
+                                </div>
+                            </div>
+
+                            <hr />
+
+                            <!-- Order Items -->
+                            <h6 class="mb-3"><i class="fa fa-car me-2"></i>Order Items</h6>
+                            @if (order.Items != null && order.Items.Any())
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-bordered">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Product</th>
+                                                <th class="text-center">Quantity</th>
+                                                <th class="text-end">Unit Price</th>
+                                                <th class="text-end">Subtotal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var item in order.Items)
+                                            {
+                                                <tr>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            @if (item.Product?.Image != null)
+                                                            {
+                                                                <img src="@GetImageUrl(item.Product.Image)" alt="@item.ProductName" class="me-3 rounded" style="width: 60px; height: 45px; object-fit: cover;" />
+                                                            }
+                                                            <div>
+                                                                <strong>@item.ProductName</strong>
+                                                                @if (item.Product != null)
+                                                                {
+                                                                    <br />
+                                                                    <small class="text-muted">@item.Product.Brand @item.Product.Year</small>
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-center">@item.Quantity</td>
+                                                    <td class="text-end">@item.Price.ToString("N0") TND</td>
+                                                    <td class="text-end"><strong>@((item.Price * item.Quantity).ToString("N0")) TND</strong></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                        <tfoot class="table-light">
+                                            <tr>
+                                                <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                                                <td class="text-end"><strong>@order.TotalAmount.ToString("N0") TND</strong></td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="3" class="text-end"><strong>Tax:</strong></td>
+                                                <td class="text-end"><strong>--</strong></td>
+                                            </tr>
+                                            <tr style="background-color: #f0f0f0;">
+                                                <td colspan="3" class="text-end"><strong style="font-size: 14pt;">TOTAL:</strong></td>
+                                                <td class="text-end"><strong style="font-size: 14pt; color: #d32f2f;">@order.TotalAmount.ToString("N0") TND</strong></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="text-muted">No items in this order.</p>
+                            }
+
+                            @if (!string.IsNullOrEmpty(order.Notes))
+                            {
+                                <hr />
+                                <h6 class="mb-3"><i class="fa fa-sticky-note me-2"></i>Notes</h6>
+                                <p class="text-muted">@order.Notes</p>
+                            }
+                            
+                            <!-- Print Footer -->
+                            <div class="print-only" style="display: none; margin-top: 40px; padding-top: 20px; border-top: 2px solid #333;">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Payment Terms:</strong> @order.PaymentMethod</p>
+                                        <p><strong>Order Status:</strong> @order.Status</p>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <p><strong>Thank you for your business!</strong></p>
+                                        <p class="text-muted small">Tunis Motors - Drive Your Future</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="col-lg-4">
+                    <!-- Quick Actions -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-dark text-white">
+                            <h6 class="mb-0"><i class="fa fa-bolt me-2"></i>Quick Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                @* Only Admin and Manager can update order status *@
+                                @if ((isAdmin || isManager) && CanUpdateStatus())
+                                {
+                                    <button class="btn btn-warning" @onclick="() => ShowUpdateModal(order.Status)">
+                                        <i class="fa fa-edit me-2"></i>Update Status
+                                    </button>
+                                }
+
+                                @* Cancel button - available to admins/managers and regular users if order can be cancelled *@
+                                @if (CanCancel())
+                                {
+                                    <button class="btn btn-danger" @onclick="ShowCancelModal">
+                                        <i class="fa fa-times me-2"></i>Cancel Order
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Order Summary -->
+                    <div class="card shadow">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="fa fa-calculator me-2"></i>Order Summary</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Subtotal:</span>
+                                <strong>@order.TotalAmount.ToString("N0") TND</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Tax:</span>
+                                <span class="text-muted">--</span>
+                            </div>
+                            <hr />
+                            <div class="d-flex justify-content-between mb-3">
+                                <strong>Total:</strong>
+                                <strong class="text-success h5">@order.TotalAmount.ToString("N0") TND</strong>
+                            </div>
+                            <div class="text-center">
+                                <small class="text-muted">
+                                    <i class="fa fa-info-circle me-1"></i>
+                                    @{
+                                        var itemCount = order.Items?.Count ?? 0;
+                                    }
+                                    @itemCount @(itemCount == 1 ? "item" : "items") in this order
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="fa fa-exclamation-circle fa-4x text-danger mb-3"></i>
+                <h4>Order Not Found</h4>
+                <p class="text-muted">The order you're looking for doesn't exist or you don't have permission to view it.</p>
+                <button class="btn btn-primary" @onclick="GoBack">
+                    <i class="fa fa-arrow-left me-2"></i>Go Back
+                </button>
+            </div>
+        }
+    </div>
+</div>
+<!-- /SECTION -->
+
+<!-- Update Status Modal - Only for Admin and Manager -->
+@if (showUpdateModal && (isAdmin || isManager))
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Order Status</h5>
+                    <button type="button" class="btn-close" @onclick="CloseUpdateModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">New Status</label>
+                        <select class="form-select" @bind="selectedStatus">
+                            <option value="Pending">Pending</option>
+                            <option value="Confirmed">Confirmed</option>
+                            <option value="Processing">Processing</option>
+                            <option value="Shipped">Shipped</option>
+                            <option value="Delivered">Delivered</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (optional)</label>
+                        <textarea class="form-control" @bind="statusNotes" rows="3" placeholder="Add any notes..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseUpdateModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="ConfirmStatusUpdate" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Update Status
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Cancel Order Modal -->
+@if (showCancelModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Cancel Order</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseCancelModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fa fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> This action will cancel the order.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cancellation Reason <span class="text-danger">*</span></label>
+                        <textarea class="form-control" @bind="cancelReason" rows="3" placeholder="Explain why..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseCancelModal">Close</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmCancelOrder" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Cancel Order
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .status-timeline {
+        position: relative;
+        padding-left: 40px;
+    }
+
+    .timeline-item {
+        position: relative;
+        padding-bottom: 25px;
+        color: #999;
+    }
+
+    .timeline-item.active {
+        color: #333;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: -40px;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background-color: #ddd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        color: #999;
+        border: 3px solid #fff;
+        box-shadow: 0 0 0 2px #ddd;
+    }
+
+    .timeline-marker.completed {
+        background-color: #28a745;
+        color: white;
+        box-shadow: 0 0 0 2px #28a745;
+    }
+
+    .timeline-marker.cancelled {
+        background-color: #dc3545;
+        color: white;
+        box-shadow: 0 0 0 2px #dc3545;
+    }
+
+    .timeline-item:not(:last-child)::before {
+        content: '';
+        position: absolute;
+        left: -24px;
+        top: 32px;
+        bottom: -25px;
+        width: 2px;
+        background-color: #ddd;
+    }
+
+    .timeline-item.active:not(:last-child)::before {
+        background-color: #28a745;
+    }
+
+    .timeline-content {
+        padding-left: 10px;
+    }
+
+    /* Print Styles */
+    @@media print {
+        /* Hide navigation and buttons */
+        #breadcrumb, #print-btn, #back-btn, .btn, .modal, .alert, .status-timeline, .col-lg-4 {
+            display: none !important;
+        }
+        
+        /* Show invoice header */
+        .invoice-header {
+            display: block !important;
+        }
+        
+        /* Page setup */
+        @@page {
+            size: A4;
+            margin: 1.5cm;
+        }
+        
+        body {
+            font-size: 12pt;
+            line-height: 1.4;
+            color: #000;
+            background: #fff;
+        }
+        
+        /* Card styling */
+        .card {
+            border: 1px solid #ddd !important;
+            box-shadow: none !important;
+            page-break-inside: avoid;
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            background-color: #f8f9fa !important;
+            color: #333 !important;
+            border-bottom: 2px solid #333 !important;
+            padding: 15px !important;
+        }
+        
+        .card-body {
+            padding: 20px !important;
+        }
+        
+        /* Invoice header styling */
+        .invoice-header {
+            border-bottom: 3px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .invoice-title {
+            font-size: 32pt;
+            font-weight: bold;
+            color: #d32f2f;
+            margin: 0;
+            letter-spacing: 2px;
+        }
+        
+        .invoice-subtitle {
+            font-size: 18pt;
+            color: #666;
+            margin: 5px 0 20px 0;
+            font-weight: 300;
+        }
+        
+        .invoice-company-info {
+            font-size: 10pt;
+            line-height: 1.8;
+            color: #555;
+        }
+        
+        .invoice-number-box, .invoice-date-box {
+            display: inline-block;
+            border: 2px solid #333;
+            padding: 15px 25px;
+            text-align: center;
+            min-width: 150px;
+        }
+        
+        .invoice-label {
+            font-size: 9pt;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0;
+            color: #666;
+        }
+        
+        .invoice-number {
+            font-size: 24pt;
+            font-weight: bold;
+            margin: 5px 0 0 0;
+            color: #d32f2f;
+        }
+        
+        .invoice-date {
+            font-size: 14pt;
+            font-weight: bold;
+            margin: 5px 0 0 0;
+            color: #333;
+        }
+        
+        /* Table styling */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        .table th {
+            background-color: #333 !important;
+            color: #fff !important;
+            padding: 12px !important;
+            text-align: left;
+            font-weight: bold;
+            border: 1px solid #000;
+        }
+        
+        .table td {
+            padding: 10px 12px !important;
+            border: 1px solid #ddd;
+        }
+        
+        .table tfoot {
+            background-color: #f5f5f5 !important;
+            font-weight: bold;
+        }
+        
+        .table tfoot td {
+            border-top: 2px solid #333;
+            padding: 15px 12px !important;
+        }
+        
+        /* Typography */
+        h2, h3, h4, h5, h6 {
+            color: #333 !important;
+            page-break-after: avoid;
+        }
+        
+        h5 {
+            font-size: 14pt;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 8px;
+        }
+        
+        /* Customer info styling */
+        .row {
+            page-break-inside: avoid;
+        }
+        
+        /* Remove colors from badges in print */
+        .badge {
+            background-color: #666 !important;
+            color: #fff !important;
+            border: 1px solid #333;
+            padding: 4px 8px;
+        }
+        
+        /* Links */
+        a {
+            color: #000 !important;
+            text-decoration: none;
+        }
+        
+        /* Images */
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* Summary box */
+        .col-lg-8 {
+            width: 100% !important;
+        }
+        
+        /* Spacing */
+        .mb-4, .mb-3 {
+            margin-bottom: 20px !important;
+        }
+        
+        hr {
+            border-color: #ddd;
+            margin: 20px 0;
+        }
+        
+        /* Hide icons in print for cleaner look (but keep some) */
+        .fa.me-2 {
+            display: none;
+        }
+        
+        /* Show print-only elements */
+        .print-only {
+            display: block !important;
+        }
+        
+        /* Ensure proper page breaks */
+        .card {
+            page-break-inside: avoid;
+        }
+        
+        /* Footer space */
+        body::after {
+            content: "Tunis Motors - Drive Your Future";
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 9pt;
+            color: #999;
+            padding: 10px;
+            border-top: 1px solid #ddd;
+        }
+    }
+    
+    /* Screen-only styles */
+    @@media screen {
+        .invoice-header {
+            display: none;
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private OrderDto? order;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private bool isAdmin = false;
+    private bool isManager = false;
+    private string successMessage = "";
+    private string errorMessage = "";
+
+    // Modals
+    private bool showUpdateModal = false;
+    private bool showCancelModal = false;
+    private string selectedStatus = "";
+    private string statusNotes = "";
+    private string cancelReason = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserRoles();
+        await LoadOrder();
+    }
+
+    private async Task CheckUserRoles()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        isAdmin = user.IsInRole("Admin");
+        isManager = user.IsInRole("Manager");
+    }
+
+    private async Task LoadOrder()
+    {
+        try
+        {
+            isLoading = true;
+            order = await OrderService.GetOrderByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load order details.";
+            Console.WriteLine($"Error loading order: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool CanUpdateStatus()
+    {
+        if (order == null) return false;
+        return order.Status != "Delivered" && order.Status != "Cancelled" && order.Status != "Refunded";
+    }
+
+    private bool CanCancel()
+    {
+        if (order == null) return false;
+        return order.Status != "Delivered" && order.Status != "Cancelled" && order.Status != "Refunded";
+    }
+
+    private bool IsStatusReached(string status)
+    {
+        if (order == null) return false;
+        
+        var statuses = new[] { "Pending", "Confirmed", "Processing", "Shipped", "Delivered" };
+        var currentIndex = Array.IndexOf(statuses, order.Status);
+        var targetIndex = Array.IndexOf(statuses, status);
+        
+        return currentIndex >= targetIndex;
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Pending" => "bg-warning text-dark",
+            "Confirmed" or "Processing" => "bg-info",
+            "Shipped" => "bg-primary",
+            "Delivered" => "bg-success",
+            "Cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private void ShowUpdateModal(string currentStatus)
+    {
+        // Only allow admins and managers to update status
+        if (!isAdmin && !isManager)
+        {
+            return;
+        }
+        
+        selectedStatus = currentStatus;
+        statusNotes = "";
+        showUpdateModal = true;
+    }
+
+    private void CloseUpdateModal()
+    {
+        showUpdateModal = false;
+        selectedStatus = "";
+        statusNotes = "";
+    }
+
+    private async Task ConfirmStatusUpdate()
+    {
+        // Security check: Only admins and managers can update status
+        if (!isAdmin && !isManager)
+        {
+            errorMessage = "You do not have permission to update order status.";
+            CloseUpdateModal();
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            var success = await OrderService.UpdateOrderStatusAsync(Id, selectedStatus);
+            
+            if (success)
+            {
+                successMessage = $"Order status updated to {selectedStatus} successfully!";
+                CloseUpdateModal();
+                await LoadOrder();
+            }
+            else
+            {
+                errorMessage = "Failed to update order status.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred while updating order status.";
+            Console.WriteLine($"Error updating status: {ex.Message}");
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private void ShowCancelModal()
+    {
+        cancelReason = "";
+        showCancelModal = true;
+    }
+
+    private void CloseCancelModal()
+    {
+        showCancelModal = false;
+        cancelReason = "";
+    }
+
+    private async Task ConfirmCancelOrder()
+    {
+        if (string.IsNullOrEmpty(cancelReason))
+        {
+            errorMessage = "Please provide a cancellation reason.";
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            var success = await OrderService.CancelOrderAsync(Id, cancelReason);
+            
+            if (success)
+            {
+                successMessage = "Order cancelled successfully!";
+                CloseCancelModal();
+                await LoadOrder();
+            }
+            else
+            {
+                errorMessage = "Failed to cancel order.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred while cancelling the order.";
+            Console.WriteLine($"Error cancelling order: {ex.Message}");
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        if (isAdmin || isManager)
+        {
+            NavigationManager.NavigateTo("/admin/orders");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/profile/my-orders");
+        }
+    }
+
+    private async Task PrintOrder()
+    {
+        // Navigate to dedicated print page
+        NavigationManager.NavigateTo($"/order/{Id}/print");
+    }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+            return "/images/noimage.jpg";
+        
+        if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://"))
+            return imagePath;
+        
+        var apiBaseUrl = Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5237";
+        if (imagePath.StartsWith("/"))
+            return $"{apiBaseUrl}{imagePath}";
+        
+        return $"{apiBaseUrl}/images/{imagePath}";
+    }
+}

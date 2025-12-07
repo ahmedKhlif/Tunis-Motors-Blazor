@@ -1,0 +1,153 @@
+# Images and media files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.ico
+*.svg
+*.webp
+*.tiff
+*.psd
+*.ai
+*.eps
+*.raw
+*.cr2
+*.nef
+*.orf
+*.sr2
+*.mov
+*.mp4
+*.avi
+*.mkv
+*.wmv
+*.flv
+*.webm
+*.mp3
+*.wav
+*.flac
+*.aac
+*.ogg
+*.wma
+
+# Diagram files (images)
+diagrammes/*.png
+diagrammes/*.jpg
+diagrammes/*.jpeg
+diagrammes/*.svg
+screenshots/*.png
+screenshots/*.jpg
+screenshots/*.jpeg
+
+# Markdown files (except README.md)
+*.md
+!README.md
+
+# Log files
+*.log
+logs/
+Logs/
+[Ll]og/
+[Ll]ogs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Configuration JSON files
+appsettings.json
+appsettings.*.json
+!appsettings.Development.json.example
+!appsettings.Production.json.example
+wwwroot/appsettings.json
+
+# LaTeX files
+*.tex
+*.aux
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.pdf
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio cache/options directory
+.vs/
+.vscode/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet Packages
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
+
+# Database files
+*.mdf
+*.ldf
+*.ndf
+*.bak
+*.sql
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+*.old
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Test results
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+
+# Rider
+.idea/
+*.sln.iml
+
+# Node modules (if any)
+node_modules/
+npm-debug.log
+yarn-error.log

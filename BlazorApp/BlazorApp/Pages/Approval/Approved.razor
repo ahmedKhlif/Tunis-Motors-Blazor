@@ -1,0 +1,183 @@
+@page "/admin/approved-listings"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject IApprovalService ApprovalService
+@inject NavigationManager NavigationManager
+
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fa fa-check-circle me-2"></i>Approved Listings</h2>
+                <a href="/admin/approvals" class="btn btn-outline-primary">
+                    <i class="fa fa-clock me-2"></i>View Pending Approvals
+                </a>
+            </div>
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                </div>
+            }
+
+            @if (isLoading)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading approved listings...</p>
+                </div>
+            }
+            else if (approvedListings != null && approvedListings.Any())
+            {
+                <div class="card shadow">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-success">
+                                    <tr>
+                                        <th class="border-0">Image</th>
+                                        <th class="border-0">Car Details</th>
+                                        <th class="border-0">Seller</th>
+                                        <th class="border-0">Price</th>
+                                        <th class="border-0">Approved Date</th>
+                                        <th class="border-0 text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var listing in approvedListings)
+                                    {
+                                        <tr>
+                                            <td class="border-0">
+                                                @if (!string.IsNullOrEmpty(listing.Image))
+                                                {
+                                                    <img src="/images/@listing.Image" alt="@listing.Name" class="img-thumbnail" style="width: 60px; height: 45px; object-fit: cover;" />
+                                                }
+                                                else
+                                                {
+                                                    <div class="bg-light d-flex align-items-center justify-content-center" style="width: 60px; height: 45px;">
+                                                        <i class="fa fa-car text-muted"></i>
+                                                    </div>
+                                                }
+                                            </td>
+                                            <td class="border-0">
+                                                <div>
+                                                    <strong>@listing.Name</strong>
+                                                    <br />
+                                                    <small class="text-muted">@listing.Brand @listing.Year</small>
+                                                </div>
+                                            </td>
+                                            <td class="border-0">
+                                                <span class="badge bg-info">@(listing.Seller?.UserName ?? "Unknown")</span>
+                                            </td>
+                                            <td class="border-0">
+                                                <strong class="text-success">@listing.Price.ToString("N0") TND</strong>
+                                            </td>
+                                            <td class="border-0">
+                                                <small class="text-muted">
+                                                    @(listing.ApprovedAt?.ToString("MMM dd, yyyy") ?? "N/A")
+                                                </small>
+                                            </td>
+                                            <td class="border-0 text-center">
+                                                <div class="btn-group" role="group">
+                                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewDetails(listing.ProductId)">
+                                                        <i class="fa fa-eye"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-info" @onclick="() => ViewPublic(listing.ProductId)">
+                                                        <i class="fa fa-external-link-alt"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Card -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card border-success">
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <h4 class="text-success">@approvedListings.Count</h4>
+                                        <small class="text-muted">Total Approved</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h4 class="text-primary">@approvedListings.Sum(l => l.Price).ToString("N0") TND</h4>
+                                        <small class="text-muted">Total Value</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h4 class="text-info">@approvedListings.Select(l => l.Seller?.UserName).Distinct().Count()</h4>
+                                        <small class="text-muted">Active Sellers</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h4 class="text-warning">@approvedListings.GroupBy(l => l.Brand).Count()</h4>
+                                        <small class="text-muted">Brands</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fa fa-check-circle fa-4x text-success mb-3"></i>
+                    <h4 class="text-muted">No approved listings yet</h4>
+                    <p class="text-muted">Approved car listings will appear here once they are reviewed and approved.</p>
+                    <a href="/admin/approvals" class="btn btn-primary">
+                        <i class="fa fa-clock me-2"></i>Check Pending Approvals
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<CarListingDto> approvedListings = new();
+    private bool isLoading = true;
+    private string successMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadApprovedListings();
+    }
+
+    private async Task LoadApprovedListings()
+    {
+        try
+        {
+            isLoading = true;
+            approvedListings = await ApprovalService.GetApprovedListingsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading approved listings: {ex.Message}");
+            approvedListings = new List<CarListingDto>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ViewDetails(int listingId)
+    {
+        NavigationManager.NavigateTo($"/admin/approval-details/{listingId}");
+    }
+
+    private void ViewPublic(int listingId)
+    {
+        NavigationManager.NavigateTo($"/product/{listingId}");
+    }
+}

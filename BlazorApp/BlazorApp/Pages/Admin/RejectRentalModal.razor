@@ -1,0 +1,59 @@
+@using BlazorApp.Models
+
+<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reject Rental Request</h5>
+                <button type="button" class="btn-close" @onclick="OnCancel"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fa fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone. The rental request will be permanently rejected.
+                </div>
+
+                <div class="rental-summary mb-3">
+                    <h6>Rental Details:</h6>
+                    <p><strong>Car:</strong> @Rental.CarName</p>
+                    <p><strong>Customer:</strong> @Rental.UserName (@Rental.UserEmail)</p>
+                    <p><strong>Duration:</strong> @Rental.FormattedPickupDate - @Rental.FormattedReturnDueDate</p>
+                    <p><strong>Requested:</strong> @Rental.FormattedRequestedDate</p>
+                </div>
+
+                <form>
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">Rejection Reason <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="reason" rows="4"
+                                  @bind="reason" placeholder="Please provide a reason for rejecting this rental request..." required></textarea>
+                        <div class="form-text">This reason will be communicated to the customer.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="OnCancel">Cancel</button>
+                <button type="button" class="btn btn-danger" @onclick="HandleConfirm" disabled="@(!IsValid)">
+                    <i class="fa fa-times"></i> Reject Rental
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CarRentalDto Rental { get; set; }
+    [Parameter] public EventCallback<string> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string reason = "";
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(reason);
+
+    private async Task HandleConfirm()
+    {
+        if (IsValid)
+        {
+            await OnConfirm.InvokeAsync(reason);
+        }
+    }
+}

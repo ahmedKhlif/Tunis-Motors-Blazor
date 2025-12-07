@@ -1,0 +1,503 @@
+@page "/my-rentals"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using BlazorApp.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ICarRentalService CarRentalService
+@inject NavigationManager NavManager
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">My Rentals</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li class="active">My Rentals</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+<div class="container py-5">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5 fw-bold text-primary mb-3">
+                <i class="fa fa-calendar me-3"></i>My Rentals
+            </h1>
+            <p class="lead text-muted">Manage your car rental bookings and history</p>
+        </div>
+    </div>
+
+    <!-- View Toggle -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn @(currentView == "list" ? "btn-primary" : "btn-outline-primary")" @onclick="SetViewList">
+                                <i class="fa fa-list me-2"></i>List View
+                            </button>
+                            <button type="button" class="btn @(currentView == "calendar" ? "btn-primary" : "btn-outline-primary")" @onclick="SetViewCalendar">
+                                <i class="fa fa-calendar me-2"></i>Calendar View
+                            </button>
+                        </div>
+
+                        @if (currentView == "list")
+                        {
+                            <div class="d-flex gap-3">
+                                <div class="input-group" style="width: 200px;">
+                                    <span class="input-group-text"><i class="fa fa-filter"></i></span>
+                                    <select class="form-select" @bind="filter.Status" @bind:after="ApplyFilters">
+                                        <option value="">All Statuses</option>
+                                        <option value="@RentalStatus.REQUESTED">Requested</option>
+                                        <option value="@RentalStatus.APPROVED">Approved</option>
+                                        <option value="@RentalStatus.ACTIVE">Active</option>
+                                        <option value="@RentalStatus.OVERDUE">Overdue</option>
+                                        <option value="@RentalStatus.RETURNED">Returned</option>
+                                        <option value="@RentalStatus.CANCELLED">Cancelled</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-outline-secondary" @onclick="ClearFilters">
+                                    <i class="fa fa-times me-2"></i>Clear
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (currentView == "calendar")
+    {
+        <!-- Calendar View -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-lg">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fa fa-calendar me-2"></i>My Rental Calendar</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="myRentalCalendar" style="height: 600px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Filters for List View -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-3">
+                                <label for="startDate" class="form-label fw-bold">From Date</label>
+                                <input type="date" id="startDate" class="form-control" @bind="startDateFilter" @bind:after="ApplyFilters">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="endDate" class="form-label fw-bold">To Date</label>
+                                <input type="date" id="endDate" class="form-control" @bind="endDateFilter" @bind:after="ApplyFilters">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Quick Filters</label>
+                                <div class="btn-group w-100">
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="@(() => SetQuickFilter("upcoming"))">Upcoming</button>
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="@(() => SetQuickFilter("active"))">Active</button>
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="@(() => SetQuickFilter("past"))">Past</button>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+                                    <i class="fa fa-times me-2"></i>Clear All Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Rentals List -->
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading your rentals...</p>
+        </div>
+    }
+    else if (rentals != null && rentals.Data.Any())
+    {
+        <div class="row">
+            @foreach (var rental in rentals.Data)
+            {
+                <div class="col-12 mb-4">
+                    <div class="card border-0 shadow-lg">
+                        <div class="card-body p-4">
+                            <div class="row align-items-center">
+                                <!-- Car Image -->
+                                <div class="col-lg-2 col-md-3 mb-3 mb-md-0">
+                                    <img src="@GetImageUrl(rental.CarImage)" class="img-fluid rounded"
+                                         alt="@rental.CarName" style="max-height: 120px; object-fit: cover;">
+                                </div>
+
+                                <!-- Rental Details -->
+                                <div class="col-lg-6 col-md-5">
+                                    <h5 class="card-title mb-2">@rental.CarName</h5>
+                                    <p class="card-text text-muted mb-2">@rental.UserName</p>
+
+                                    <div class="row">
+                                        <div class="col-sm-6">
+                                            <small class="text-muted d-block">Pickup Date</small>
+                                            <strong>@rental.PickupDate?.ToString("MMM dd, yyyy")</strong>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <small class="text-muted d-block">Return Due Date</small>
+                                            <strong>@rental.ReturnDueDate?.ToString("MMM dd, yyyy")</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-2">
+                                        <small class="text-muted d-block">Total Cost</small>
+                                        <strong class="text-primary h6">@rental.TotalCost.ToString("N0") TND</strong>
+                                    </div>
+                                </div>
+
+                                <!-- Status & Actions -->
+                                <div class="col-lg-4 col-md-4 text-lg-end">
+                                    <div class="mb-3">
+                                        @GetStatusBadge(rental.Status)
+                                    </div>
+
+                                    <div class="d-flex gap-2 justify-content-lg-end flex-wrap">
+                                        @if (rental.Status == RentalStatus.REQUESTED)
+                                        {
+                                            <button class="btn btn-outline-danger btn-sm" @onclick="() => CancelRental(rental.Id)">
+                                                <i class="fa fa-times me-1"></i>Cancel
+                                            </button>
+                                        }
+                                        @if (rental.Status == RentalStatus.APPROVED || rental.Status == RentalStatus.ACTIVE)
+                                        {
+                                            <button class="btn btn-outline-primary btn-sm" @onclick="() => ViewDetails(rental.Id)">
+                                                <i class="fa fa-eye me-1"></i>Details
+                                            </button>
+                                        }
+                                        @if (rental.Status == RentalStatus.ACTIVE)
+                                        {
+                                            <button class="btn btn-outline-warning btn-sm" @onclick="() => ReturnCar(rental.Id)">
+                                                <i class="fa fa-undo me-1"></i>Return
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Pagination -->
+        @if (rentals.TotalPages > 1)
+        {
+            <nav aria-label="Rentals pagination" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    @for (int i = 1; i <= rentals.TotalPages; i++)
+                    {
+                        <li class="page-item @(i == rentals.PageNumber ? "active" : "")">
+                            <a class="page-link" href="#" @onclick="() => GoToPage(i)">@i</a>
+                        </li>
+                    }
+                </ul>
+            </nav>
+        }
+    }
+    else
+    {
+        <div class="text-center py-5">
+            <i class="fa fa-calendar fa-4x text-muted mb-4"></i>
+            <h3 class="text-muted mb-3">No Rentals Found</h3>
+            <p class="text-muted mb-4">You haven't made any rental bookings yet.</p>
+            <a href="/rentals" class="btn btn-primary">
+                <i class="fa fa-plus me-2"></i>Browse Rental Cars
+            </a>
+        </div>
+    }
+</div>
+    </div>
+</div>
+<!-- /SECTION -->
+
+<!-- Notification Dialog -->
+<NotificationDialog @bind-Show="showNotification" 
+                  Title="@notificationTitle" 
+                  Message="@notificationMessage" 
+                  Type="@notificationType"
+                  OnClose="OnNotificationClose" />
+
+@code {
+    private PaginatedDto<CarRentalDto> rentals;
+    private CarRentalFilterDto filter = new() { PageSize = 10 };
+    private DateTime? startDateFilter;
+    private DateTime? endDateFilter;
+    private bool isLoading = true;
+    private string currentView = "list";
+    private List<CalendarEventDto> calendarEvents = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ApplyFilters();
+        await LoadCalendarEventsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && currentView == "calendar")
+        {
+            await InitializeCalendarAsync();
+        }
+        else if (currentView == "calendar" && calendarEvents.Any())
+        {
+            await InitializeCalendarAsync();
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Apply date filters
+            if (startDateFilter.HasValue)
+            {
+                filter.StartDate = startDateFilter.Value;
+            }
+            if (endDateFilter.HasValue)
+            {
+                filter.EndDate = endDateFilter.Value;
+            }
+
+            var result = await CarRentalService.GetMyRentalsAsync(filter);
+            rentals = result.Data ?? new PaginatedDto<CarRentalDto>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading rentals: {ex.Message}");
+            rentals = new PaginatedDto<CarRentalDto>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadCalendarEventsAsync()
+    {
+        try
+        {
+            var start = DateTime.Now.AddMonths(-1);
+            var end = DateTime.Now.AddMonths(3);
+
+            var result = await CarRentalService.GetRentalCalendarEventsAsync(start, end);
+            if (result.Success)
+            {
+                calendarEvents = result.Data;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading calendar events: {ex.Message}");
+        }
+    }
+
+    private async Task InitializeCalendarAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("initializeMyRentalCalendar", calendarEvents);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing calendar: {ex.Message}");
+        }
+    }
+
+    private async Task SetQuickFilter(string filterType)
+    {
+        var now = DateTime.Now;
+
+        switch (filterType)
+        {
+            case "upcoming":
+                startDateFilter = now;
+                endDateFilter = now.AddMonths(1);
+                filter.Status = null;
+                break;
+            case "active":
+                startDateFilter = null;
+                endDateFilter = null;
+                filter.Status = RentalStatus.ACTIVE;
+                break;
+            case "past":
+                startDateFilter = null;
+                endDateFilter = now;
+                filter.Status = null;
+                break;
+        }
+
+        await ApplyFilters();
+    }
+
+    private async Task ClearFilters()
+    {
+        filter = new CarRentalFilterDto { PageSize = 10 };
+        startDateFilter = null;
+        endDateFilter = null;
+        await ApplyFilters();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        filter.Page = page;
+        await ApplyFilters();
+    }
+
+    private async Task CancelRental(int rentalId)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to cancel this rental?");
+        if (!confirmed) return;
+
+        try
+        {
+            var result = await CarRentalService.CancelRentalAsync(rentalId, "Cancelled by user");
+            if (result.Success)
+            {
+                ShowNotification("Success", "Rental cancelled successfully.", NotificationType.Success);
+                await ApplyFilters();
+            }
+            else
+            {
+                ShowNotification("Error", result.Message ?? "Failed to cancel rental", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cancelling rental: {ex.Message}");
+            ShowNotification("Error", "An error occurred while cancelling the rental.", NotificationType.Error);
+        }
+    }
+
+    private async Task ReturnCar(int rentalId)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to return this car?");
+        if (!confirmed) return;
+
+        try
+        {
+            var result = await CarRentalService.ReturnRentalAsync(rentalId, new ReturnRentalDto { ReturnDate = DateTime.Now });
+            if (result.Success)
+            {
+                ShowNotification("Success", "Car returned successfully.", NotificationType.Success);
+                await ApplyFilters();
+            }
+            else
+            {
+                ShowNotification("Error", result.Message ?? "Failed to return car", NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error returning car: {ex.Message}");
+            ShowNotification("Error", "An error occurred while returning the car.", NotificationType.Error);
+        }
+    }
+
+    private void ViewDetails(int rentalId)
+    {
+        NavManager.NavigateTo($"/rental/{rentalId}");
+    }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+            return "/images/noimage.jpg";
+
+        if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://"))
+            return imagePath;
+
+        var apiBaseUrl = Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5237";
+        if (imagePath.StartsWith("/"))
+            return $"{apiBaseUrl}{imagePath}";
+
+        return $"{apiBaseUrl}/images/{imagePath}";
+    }
+
+    private void SetViewList()
+    {
+        currentView = "list";
+        StateHasChanged();
+    }
+
+    private async Task SetViewCalendar()
+    {
+        currentView = "calendar";
+        StateHasChanged();
+        await Task.Delay(100);
+        await InitializeCalendarAsync();
+    }
+
+    private MarkupString GetStatusBadge(RentalStatus status)
+    {
+        var (badgeClass, icon, text) = status switch
+        {
+            RentalStatus.REQUESTED => ("badge bg-warning text-dark", "fa-clock", "Requested"),
+            RentalStatus.APPROVED => ("badge bg-info text-dark", "fa-check-circle", "Approved"),
+            RentalStatus.ACTIVE => ("badge bg-success", "fa-play-circle", "Active"),
+            RentalStatus.OVERDUE => ("badge bg-danger", "fa-exclamation-triangle", "Overdue"),
+            RentalStatus.RETURNED => ("badge bg-secondary", "fa-check", "Returned"),
+            RentalStatus.CANCELLED => ("badge bg-dark", "fa-times", "Cancelled"),
+            _ => ("badge bg-light text-dark", "fa-question", "Unknown")
+        };
+
+        return new MarkupString($"<span class='{badgeClass}'><i class='fa {icon} me-1'></i>{text}</span>");
+    }
+    
+    // Notification dialog
+    private bool showNotification = false;
+    private string notificationTitle = "";
+    private string notificationMessage = "";
+    private NotificationType notificationType = NotificationType.Info;
+    
+    private void ShowNotification(string title, string message, NotificationType type = NotificationType.Info)
+    {
+        notificationTitle = title;
+        notificationMessage = message;
+        notificationType = type;
+        showNotification = true;
+        StateHasChanged();
+    }
+    
+    private void OnNotificationClose()
+    {
+        showNotification = false;
+        StateHasChanged();
+    }
+}

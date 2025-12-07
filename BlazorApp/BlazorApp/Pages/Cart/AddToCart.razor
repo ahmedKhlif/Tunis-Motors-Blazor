@@ -1,0 +1,52 @@
+@page "/cart/add/{id}"
+@using BlazorApp.Models
+@using BlazorApp.Services
+@inject ICartService CartService
+@inject NavigationManager NavigationManager
+@inject IAuthService AuthService
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is logged in
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            NavigationManager.NavigateTo($"/login?returnUrl=/cart/add/{id}");
+            return;
+        }
+
+        // Try to parse the product ID
+        if (!int.TryParse(id, out int productId))
+        {
+            NavigationManager.NavigateTo("/cart");
+            return;
+        }
+
+        try
+        {
+            // Add product to cart with quantity 1
+            var addToCartModel = new AddToCartDto { ProductId = productId, Quantity = 1 };
+            var response = await CartService.AddToCartAsync(addToCartModel);
+
+            if (response.Success)
+            {
+                // Redirect to cart page
+                NavigationManager.NavigateTo("/cart");
+            }
+            else
+            {
+                // If add to cart fails, go back to product details
+                NavigationManager.NavigateTo($"/product/{productId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error adding to cart: {ex.Message}");
+            NavigationManager.NavigateTo($"/product/{productId}");
+        }
+    }
+}

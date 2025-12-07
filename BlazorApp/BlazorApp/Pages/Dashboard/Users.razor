@@ -1,0 +1,277 @@
+@page "/admin/dashboard-users"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject IAdminService AdminService
+@inject NavigationManager NavigationManager
+
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fa fa-users me-2"></i>Dashboard - User Management</h2>
+                <a href="/admin" class="btn btn-outline-secondary">
+                    <i class="fa fa-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                </div>
+            }
+
+            @if (isLoading)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading users...</p>
+                </div>
+            }
+            else if (users != null && users.Any())
+            {
+                <!-- User Statistics -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="card border-primary">
+                            <div class="card-body text-center">
+                                <i class="fa fa-users fa-2x text-primary mb-2"></i>
+                                <h4 class="text-primary">@users.Count</h4>
+                                <small class="text-muted">Total Users</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card border-success">
+                            <div class="card-body text-center">
+                                <i class="fa fa-user-check fa-2x text-success mb-2"></i>
+                                <h4 class="text-success">@users.Count(u => u.EmailConfirmed)</h4>
+                                <small class="text-muted">Verified</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card border-warning">
+                            <div class="card-body text-center">
+                                <i class="fa fa-user-tag fa-2x text-warning mb-2"></i>
+                                <h4 class="text-warning">@users.SelectMany(u => u.Roles ?? new List<string>()).Distinct().Count()</h4>
+                                <small class="text-muted">Role Types</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card border-info">
+                            <div class="card-body text-center">
+                                <i class="fa fa-user-times fa-2x text-info mb-2"></i>
+                                <h4 class="text-info">@users.Count(u => u.IsLocked)</h4>
+                                <small class="text-muted">Locked</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="card shadow">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fa fa-list me-2"></i>All Users</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="border-0">User</th>
+                                        <th class="border-0">Email</th>
+                                        <th class="border-0">Roles</th>
+                                        <th class="border-0">Status</th>
+                                        <th class="border-0">Joined</th>
+                                        <th class="border-0 text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in users)
+                                    {
+                                        <tr>
+                                            <td class="border-0">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                        <strong>@(string.IsNullOrEmpty(user.UserName) ? "?" : user.UserName.Substring(0, 1).ToUpper())</strong>
+                                                    </div>
+                                                    <div>
+                                                        <strong>@user.UserName</strong>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="border-0">@user.Email</td>
+                                            <td class="border-0">
+                                                @if (user.Roles != null && user.Roles.Any())
+                                                {
+                                                    @foreach (var role in user.Roles)
+                                                    {
+                                                        <span class="badge bg-secondary me-1">@role</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No roles</span>
+                                                }
+                                            </td>
+                                            <td class="border-0">
+                                                @if (user.IsLocked)
+                                                {
+                                                    <span class="badge bg-danger">Locked</span>
+                                                }
+                                                else if (user.EmailConfirmed)
+                                                {
+                                                    <span class="badge bg-success">Active</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-warning">Unverified</span>
+                                                }
+                                            </td>
+                                            <td class="border-0">
+                                                <small class="text-muted">@user.CreatedAt?.ToString("MMM dd, yyyy")</small>
+                                            </td>
+                                            <td class="border-0 text-center">
+                                                <div class="btn-group" role="group">
+                                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewUserDetails(user.Id)">
+                                                        <i class="fa fa-eye"></i>
+                                                    </button>
+                                                    @if (user.IsLocked)
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-success" @onclick="() => UnlockUser(user.Id, user.UserName)">
+                                                            <i class="fa fa-unlock"></i>
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-warning" @onclick="() => LockUser(user.Id, user.UserName)">
+                                                            <i class="fa fa-lock"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fa fa-users fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">No users found</h4>
+                    <p class="text-muted">There are currently no users registered in the system.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<UserManagementDto> users = new();
+    private bool isLoading = true;
+    private string successMessage = "";
+    private string errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            isLoading = true;
+            users = await AdminService.GetAllUsersAsync() ?? new List<UserManagementDto>();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load users.";
+            Console.WriteLine($"Load users error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ViewUserDetails(string userId)
+    {
+        NavigationManager.NavigateTo($"/admin/user-details/{userId}");
+    }
+
+    private async Task LockUser(string userId, string userName)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Lock user account for {userName}?"))
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await AdminService.LockUserAsync(userId);
+            if (result.Success)
+            {
+                successMessage = $"User {userName} has been locked.";
+                await LoadUsers(); // Refresh the list
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Failed to lock user.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Lock user error: {ex.Message}");
+        }
+    }
+
+    private async Task UnlockUser(string userId, string userName)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Unlock user account for {userName}?"))
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await AdminService.UnlockUserAsync(userId);
+            if (result.Success)
+            {
+                successMessage = $"User {userName} has been unlocked.";
+                await LoadUsers(); // Refresh the list
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Failed to unlock user.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Unlock user error: {ex.Message}");
+        }
+    }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; }
+}

@@ -1,0 +1,112 @@
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header @GetHeaderClass() text-white border-0">
+                    <h5 class="modal-title">
+                        <i class="@GetIconClass() me-2"></i>
+                        @Title
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="mb-0">@Message</p>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn @GetButtonClass()" @onclick="Close">
+                        <i class="fa fa-check me-1"></i> OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "Notification";
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public AlertType Type { get; set; } = AlertType.Info;
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    public enum AlertType
+    {
+        Success,
+        Warning,
+        Error,
+        Info
+    }
+
+    private async Task Close()
+    {
+        IsVisible = false;
+        await OnClose.InvokeAsync();
+    }
+
+    private string GetHeaderClass()
+    {
+        return Type switch
+        {
+            AlertType.Success => "bg-success",
+            AlertType.Warning => "bg-warning",
+            AlertType.Error => "bg-danger",
+            AlertType.Info => "bg-info",
+            _ => "bg-primary"
+        };
+    }
+
+    private string GetButtonClass()
+    {
+        return Type switch
+        {
+            AlertType.Success => "btn-success",
+            AlertType.Warning => "btn-warning",
+            AlertType.Error => "btn-danger",
+            AlertType.Info => "btn-info",
+            _ => "btn-primary"
+        };
+    }
+
+    private string GetIconClass()
+    {
+        return Type switch
+        {
+            AlertType.Success => "fa fa-check-circle",
+            AlertType.Warning => "fa fa-exclamation-triangle",
+            AlertType.Error => "fa fa-times-circle",
+            AlertType.Info => "fa fa-info-circle",
+            _ => "fa fa-question-circle"
+        };
+    }
+}
+
+<style>
+    .modal.show {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .modal-content {
+        animation: slideDown 0.3s ease-in-out;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @@keyframes slideDown {
+        from {
+            transform: translateY(-50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+</style>

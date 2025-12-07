@@ -1,0 +1,212 @@
+@page "/admin/manage-users-in-role/{roleId}"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject IAdminService AdminService
+@inject NavigationManager NavigationManager
+
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fa fa-user-cog me-2"></i>Manage Users in Role: @roleName</h2>
+                <a href="/admin/edit-role/@RoleId" class="btn btn-outline-secondary">
+                    <i class="fa fa-arrow-left me-2"></i>Back to Edit Role
+                </a>
+            </div>
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                </div>
+            }
+
+            @if (isLoading)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading users...</p>
+                </div>
+            }
+            else
+            {
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fa fa-users me-2"></i>Select Users to Assign to Role</h5>
+                    </div>
+                    <div class="card-body">
+                        <EditForm Model="users" OnValidSubmit="HandleSubmit" FormName="manageUsersForm">
+                            @if (users.Any())
+                            {
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="selectAll" @onchange="ToggleSelectAll" checked="@isAllSelected" />
+                                        <label class="form-check-label fw-bold" for="selectAll">
+                                            Select All / Deselect All
+                                        </label>
+                                    </div>
+                                </div>
+                                <hr />
+                                <div class="row">
+                                    @foreach (var user in users)
+                                    {
+                                        <div class="col-md-6 mb-3">
+                                            <div class="card h-100 @(user.IsSelected ? "border-primary" : "")">
+                                                <div class="card-body">
+                                                    <div class="form-check">
+                                                        <InputCheckbox class="form-check-input" id="@($"user_{user.UserId}")" @bind-Value="user.IsSelected" />
+                                                        <label class="form-check-label" for="@($"user_{user.UserId}")">
+                                                            <strong>@user.UserName</strong>
+                                                            <br />
+                                                            <small class="text-muted">@user.Email</small>
+                                                            @if (!string.IsNullOrEmpty(user.FullName))
+                                                            {
+                                                                <br />
+                                                                <small class="text-secondary">@user.FullName</small>
+                                                            }
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-center py-4">
+                                    <i class="fa fa-users fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">No users found in the system.</p>
+                                </div>
+                            }
+
+                            <div class="mt-4">
+                                <button type="submit" class="btn btn-primary me-2" disabled="@isSubmitting">
+                                    @if (isSubmitting)
+                                    {
+                                        <text><span class="spinner-border spinner-border-sm me-2" role="status"></span>Updating...</text>
+                                    }
+                                    else
+                                    {
+                                        <text><i class="fa fa-save me-2"></i>Update</text>
+                                    }
+                                </button>
+                                <a href="/admin/edit-role/@RoleId" class="btn btn-outline-secondary">
+                                    <i class="fa fa-times me-2"></i>Cancel
+                                </a>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string RoleId { get; set; }
+
+    private List<UserRoleManagementDto> users = new();
+    private string roleName = "";
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string successMessage = "";
+    private string errorMessage = "";
+    private bool isAllSelected = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Get role details to display role name
+            var role = await AdminService.GetRoleByIdAsync(RoleId);
+            if (role != null)
+            {
+                roleName = role.Name;
+            }
+
+            // Get all users with their current selection status
+            users = await AdminService.GetUsersForRoleManagementAsync(RoleId);
+            UpdateSelectAllState();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load users.";
+            Console.WriteLine($"Load users error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        var selectAll = (bool)e.Value;
+        foreach (var user in users)
+        {
+            user.IsSelected = selectAll;
+        }
+        isAllSelected = selectAll;
+    }
+
+    private void UpdateSelectAllState()
+    {
+        if (users.Any())
+        {
+            isAllSelected = users.All(u => u.IsSelected);
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = "";
+        successMessage = "";
+
+        try
+        {
+            var result = await AdminService.UpdateUsersInRoleAsync(RoleId, users);
+            if (result.Success)
+            {
+                successMessage = "Users in role updated successfully!";
+                // Optionally redirect back to edit role page after a delay
+                await Task.Delay(1500);
+                NavigationManager.NavigateTo($"/admin/edit-role/{RoleId}");
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Failed to update users in role.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Update users in role error: {ex.Message}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

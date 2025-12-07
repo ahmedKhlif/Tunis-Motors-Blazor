@@ -1,0 +1,499 @@
+@page "/admin/users"
+@using BlazorApp.Models
+@using BlazorApp.Services
+@using Microsoft.AspNetCore.Components
+@using BlazorApp.Components
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject IAuthService AuthService
+@inject IAdminService AdminService
+@inject NavigationManager NavigationManager
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">User Management</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/admin">Dashboard</a></li>
+                    <li class="active">Users</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="section-title">
+                    <h3 class="title">User Management</h3>
+                    <p>Manage all registered users and their roles</p>
+                </div>
+
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="alert alert-success alert-dismissible fade show notification-toast" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                        @successMessage
+                        <button type="button" class="btn-close" @onclick="ClearSuccess"></button>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger alert-dismissible fade show notification-toast" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                        @errorMessage
+                        <button type="button" class="btn-close" @onclick="ClearError"></button>
+                    </div>
+                }
+
+                @if (isLoading)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading users...</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Username</th>
+                                    <th>Roles</th>
+                                    <th>Verification</th>
+                                    <th>Lock Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var user in users)
+                                {
+                                    <tr>
+                                        <td>@user.Email</td>
+                                        <td>@user.UserName</td>
+                                        <td>
+                                            @if (user.Roles != null && user.Roles.Any())
+                                            {
+                                                @foreach (var role in user.Roles)
+                                                {
+                                                    <span class="badge bg-primary me-1">@role</span>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">No Roles</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (user.EmailConfirmed)
+                                            {
+                                                <span class="badge bg-success"><i class="fa fa-check-circle"></i> Verified</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning"><i class="fa fa-exclamation-circle"></i> Not Verified</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (user.IsLocked)
+                                            {
+                                                <span class="badge bg-danger"><i class="fa fa-lock"></i> Locked</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-success"><i class="fa fa-check"></i> Active</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ShowRoleModal(user)" title="Edit Roles">
+                                                    <i class="fa fa-edit"></i> Roles
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-info" @onclick="() => ViewProfile(user.Id)" title="View Profile">
+                                                    <i class="fa fa-eye"></i> Profile
+                                                </button>
+                                                @if (!user.EmailConfirmed)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => SendVerificationEmailAsync(user)" title="Send Verification Email">
+                                                        <i class="fa fa-envelope"></i> Verify
+                                                    </button>
+                                                }
+                                                @if (!user.IsLocked)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-warning" @onclick="() => LockUserAsync(user)" title="Lock User">
+                                                        <i class="fa fa-lock"></i> Lock
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-sm btn-outline-success" @onclick="() => UnlockUserAsync(user)" title="Unlock User">
+                                                        <i class="fa fa-unlock"></i> Unlock
+                                                    </button>
+                                                }
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteUserAsync(user)" title="Delete User">
+                                                    <i class="fa fa-trash"></i> Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (users == null || !users.Any())
+                    {
+                        <div class="text-center py-5">
+                            <i class="fa fa-users fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">No users found</h4>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Roles Modal -->
+@if (showRoleModal && selectedUser != null)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Manage Roles - @selectedUser.UserName</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseRoleModal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Available Roles</h6>
+                    <div class="list-group">
+                        @foreach (var role in availableRoles)
+                        {
+                            var isChecked = selectedUser.Roles?.Contains(role) ?? false;
+                            <div class="list-group-item">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="role_@role" checked="@isChecked" @onchange="(ChangeEventArgs e) => ToggleRole(role, (bool)e.Value)">
+                                    <label class="form-check-label" for="role_@role">
+                                        @GetRoleIcon(role) @role
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseRoleModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveRolesAsync">
+                        <i class="fa fa-save"></i> Save Roles
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Confirm Delete Dialog -->
+<ConfirmDialog IsVisible="@showDeleteDialog"
+               Title="Delete User"
+               Message="@deleteMessage"
+               ConfirmText="Delete"
+               CancelText="Cancel"
+               Type="ConfirmDialog.DialogType.Danger"
+               OnConfirm="@ConfirmDelete"
+               OnCancel="@CancelDelete" />
+
+<style>
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .list-group-item {
+        border: 1px solid #dee2e6;
+    }
+
+    .form-check {
+        margin: 0;
+    }
+</style>
+
+@code {
+    private List<UserManagementDto> users = new();
+    private UserManagementDto selectedUser;
+    private List<string> selectedRoles = new();
+    private List<string> availableRoles = new() { "Admin", "Manager", "Seller", "Buyer" };
+    private bool showRoleModal = false;
+    private bool isLoading = true;
+    private string successMessage = "";
+    private string errorMessage = "";
+    private bool showDeleteDialog = false;
+    private string deleteMessage = "";
+    private UserManagementDto userToDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        var roles = currentUser.Roles ?? new List<string>();
+        if (!roles.Contains("Admin"))
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        isLoading = true;
+        try
+        {
+            users = await AdminService.GetAllUsersAsync() ?? new List<UserManagementDto>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading users: {ex.Message}");
+            users = new List<UserManagementDto>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshList()
+    {
+        await LoadUsers();
+    }
+
+    private void ShowRoleModal(UserManagementDto user)
+    {
+        selectedUser = user;
+        selectedRoles = new List<string>(user.Roles ?? new List<string>());
+        showRoleModal = true;
+    }
+
+    private void CloseRoleModal()
+    {
+        showRoleModal = false;
+        selectedUser = null;
+        selectedRoles.Clear();
+    }
+
+    private void ToggleRole(string role, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!selectedRoles.Contains(role))
+                selectedRoles.Add(role);
+        }
+        else
+        {
+            selectedRoles.Remove(role);
+        }
+    }
+
+    private async Task SaveRolesAsync()
+    {
+        if (selectedUser == null) return;
+
+        try
+        {
+            var currentRoles = selectedUser.Roles ?? new List<string>();
+
+            foreach (var role in selectedRoles)
+            {
+                if (!currentRoles.Contains(role))
+                {
+                    var result = await AdminService.AddUserToRoleAsync(selectedUser.Id, role);
+                    if (!result.Success)
+                    {
+                        Console.WriteLine($"Error adding role {role}: {result.Message}");
+                    }
+                }
+            }
+
+            foreach (var role in currentRoles)
+            {
+                if (!selectedRoles.Contains(role))
+                {
+                    var result = await AdminService.RemoveUserFromRoleAsync(selectedUser.Id, role);
+                    if (!result.Success)
+                    {
+                        Console.WriteLine($"Error removing role {role}: {result.Message}");
+                    }
+                }
+            }
+
+            selectedUser.Roles = new List<string>(selectedRoles);
+            CloseRoleModal();
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating roles: {ex.Message}");
+        }
+    }
+
+    private void ViewProfile(string userId)
+    {
+        NavigationManager.NavigateTo($"/profile/{userId}");
+    }
+
+    private async Task SendVerificationEmailAsync(UserManagementDto user)
+    {
+        try
+        {
+            var result = await AdminService.SendVerificationEmailAsync(user.Id);
+            if (result.Success)
+            {
+                successMessage = $"Verification email sent to {user.Email} successfully!";
+                StateHasChanged();
+                await Task.Delay(3000);
+                successMessage = "";
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = $"Error sending verification email: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error sending verification email: {ex.Message}";
+        }
+    }
+
+    private async Task LockUserAsync(UserManagementDto user)
+    {
+        try
+        {
+            var result = await AdminService.LockUserAsync(user.Id);
+            if (result.Success)
+            {
+                user.IsLocked = true;
+                successMessage = $"User {user.Email} locked successfully!";
+                StateHasChanged();
+                await Task.Delay(3000);
+                successMessage = "";
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = $"Error locking user: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error locking user: {ex.Message}";
+        }
+    }
+
+    private async Task UnlockUserAsync(UserManagementDto user)
+    {
+        try
+        {
+            var result = await AdminService.UnlockUserAsync(user.Id);
+            if (result.Success)
+            {
+                user.IsLocked = false;
+                successMessage = $"User {user.Email} unlocked successfully!";
+                StateHasChanged();
+                await Task.Delay(3000);
+                successMessage = "";
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = $"Error unlocking user: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error unlocking user: {ex.Message}";
+        }
+    }
+
+    private void DeleteUserAsync(UserManagementDto user)
+    {
+        userToDelete = user;
+        deleteMessage = $"Are you sure you want to delete user {user.Email}? This action cannot be undone.";
+        showDeleteDialog = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (userToDelete == null) return;
+
+        try
+        {
+            var result = await AdminService.DeleteUserAsync(userToDelete.Id);
+            if (result.Success)
+            {
+                successMessage = $"User {userToDelete.Email} deleted successfully!";
+                await LoadUsers();
+                StateHasChanged();
+                await Task.Delay(3000);
+                successMessage = "";
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = $"Error deleting user: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting user: {ex.Message}";
+        }
+        finally
+        {
+            userToDelete = null;
+        }
+    }
+
+    private void CancelDelete()
+    {
+        userToDelete = null;
+        showDeleteDialog = false;
+    }
+
+    private void ClearSuccess()
+    {
+        successMessage = "";
+    }
+
+    private void ClearError()
+    {
+        errorMessage = "";
+    }
+
+    private MarkupString GetRoleIcon(string role)
+    {
+        var html = role switch
+        {
+            "Admin" => "<i class='fa fa-crown'></i>",
+            "Manager" => "<i class='fa fa-cog'></i>",
+            "Seller" => "<i class='fa fa-store'></i>",
+            "Buyer" => "<i class='fa fa-shopping-cart'></i>",
+            _ => "<i class='fa fa-user'></i>"
+        };
+        return new MarkupString(html);
+    }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; }
+}

@@ -1,0 +1,76 @@
+@if (Show)
+{
+    <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header @GetHeaderClass()">
+                    <h5 class="modal-title">
+                        <i class="@GetIcon() me-2"></i>@Title
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>@Message</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn @GetButtonClass()" @onclick="Close">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@using BlazorApp.Models
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback<bool> ShowChanged { get; set; }
+    [Parameter] public string Title { get; set; } = "Notification";
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public NotificationType Type { get; set; } = NotificationType.Info;
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task Close()
+    {
+        Show = false;
+        await ShowChanged.InvokeAsync(Show);
+        await OnClose.InvokeAsync();
+    }
+
+    private string GetHeaderClass()
+    {
+        return Type switch
+        {
+            NotificationType.Success => "bg-success text-white",
+            NotificationType.Error => "bg-danger text-white",
+            NotificationType.Warning => "bg-warning text-dark",
+            NotificationType.Info => "bg-info text-white",
+            _ => "bg-secondary text-white"
+        };
+    }
+
+    private string GetButtonClass()
+    {
+        return Type switch
+        {
+            NotificationType.Success => "btn-success",
+            NotificationType.Error => "btn-danger",
+            NotificationType.Warning => "btn-warning",
+            NotificationType.Info => "btn-info",
+            _ => "btn-secondary"
+        };
+    }
+
+    private string GetIcon()
+    {
+        return Type switch
+        {
+            NotificationType.Success => "fa fa-check-circle",
+            NotificationType.Error => "fa fa-exclamation-circle",
+            NotificationType.Warning => "fa fa-exclamation-triangle",
+            NotificationType.Info => "fa fa-info-circle",
+            _ => "fa fa-bell"
+        };
+    }
+}
+

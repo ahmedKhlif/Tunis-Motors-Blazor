@@ -1,0 +1,110 @@
+@page "/admin/create-role"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject IAdminService AdminService
+@inject NavigationManager NavigationManager
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fa fa-plus-circle me-2"></i>Create New Role</h4>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            @successMessage
+                            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @errorMessage
+                            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                        </div>
+                    }
+
+                    <EditForm Model="createRoleModel" OnValidSubmit="HandleCreateRole" FormName="createRoleForm">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger" />
+
+                        <div class="mb-3">
+                            <label for="roleName" class="form-label">Role Name</label>
+                            <InputText id="roleName" class="form-control" @bind-Value="createRoleModel.RoleName" placeholder="Enter role name" />
+                            <ValidationMessage For="() => createRoleModel.RoleName" class="text-danger" />
+                            <div class="form-text">Role names should be descriptive (e.g., Manager, Seller, Buyer)</div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                                @if (isSubmitting)
+                                {
+                                    <text><span class="spinner-border spinner-border-sm me-2" role="status"></span>Creating...</text>
+                                }
+                                else
+                                {
+                                    <text><i class="fa fa-plus me-2"></i>Create Role</text>
+                                }
+                            </button>
+                            <a href="/admin/list-roles" class="btn btn-outline-secondary">
+                                <i class="fa fa-arrow-left me-2"></i>Back to Roles
+                            </a>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private CreateRoleModel createRoleModel = new();
+    private string successMessage = "";
+    private string errorMessage = "";
+    private bool isSubmitting = false;
+
+    private async Task HandleCreateRole()
+    {
+        isSubmitting = true;
+        errorMessage = "";
+        successMessage = "";
+
+        try
+        {
+            var result = await AdminService.CreateRoleAsync(createRoleModel.RoleName);
+            if (result.Success)
+            {
+                successMessage = $"Role '{createRoleModel.RoleName}' created successfully!";
+                createRoleModel.RoleName = "";
+                await Task.Delay(1500);
+                NavigationManager.NavigateTo("/admin/list-roles");
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Failed to create role.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Create role error: {ex.Message}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    public class CreateRoleModel
+    {
+        [Required(ErrorMessage = "Role name is required")]
+        [StringLength(50, MinimumLength = 2, ErrorMessage = "Role name must be between 2 and 50 characters")]
+        [RegularExpression(@"^[a-zA-Z\s]+$", ErrorMessage = "Role name can only contain letters and spaces")]
+        public string RoleName { get; set; } = "";
+    }
+}

@@ -1,0 +1,321 @@
+@page "/approval/details/{id:int}"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject ICarListingService CarListingService
+@inject IApprovalService ApprovalService
+@inject NavigationManager NavManager
+@inject IJSRuntime JSRuntime
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Review Listing</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/admin">Dashboard</a></li>
+                    <li><a href="/admin/approvals">Approvals</a></li>
+                    <li class="active">Listing #@id</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3">Loading listing details...</p>
+                </div>
+            }
+            else if (listing != null)
+            {
+                <div class="card shadow">
+                    <div class="card-header bg-warning text-dark">
+                        <h4 class="mb-0"><i class="fa fa-search me-2"></i>Review Car Listing: @listing.Name</h4>
+                        <small>Submitted by @listing.Seller?.UserName on @listing.CreatedAt.ToString("MMM dd, yyyy")</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Car Image -->
+                            <div class="col-md-6 mb-4">
+                                <div class="text-center">
+                                    <img src="@GetImageUrl(listing.Image)" alt="@listing.Name"
+                                         class="img-fluid rounded shadow" style="max-height: 300px;" onerror="this.src='/images/noimage.jpg'">
+                                </div>
+                            </div>
+
+                            <!-- Car Details -->
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Car Specifications</h5>
+                                <div class="row">
+                                    <div class="col-sm-6">
+                                        <p><strong>Model:</strong> @listing.Name</p>
+                                        <p><strong>Brand:</strong> @listing.Brand</p>
+                                        <p><strong>Year:</strong> @listing.Year</p>
+                                        <p><strong>Mileage:</strong> @listing.Mileage.ToString("N0") km</p>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <p><strong>Fuel Type:</strong> @listing.FuelType</p>
+                                        <p><strong>Transmission:</strong> @listing.Transmission</p>
+                                        <p><strong>Color:</strong> @listing.Color</p>
+                                        <p><strong>Price:</strong> @listing.Price.ToString("N0") TND</p>
+                                    </div>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(listing.VIN))
+                                {
+                                    <p><strong>VIN:</strong> @listing.VIN</p>
+                                }
+
+                                @if (listing.EngineSize.HasValue)
+                                {
+                                    <p><strong>Engine Size:</strong> @listing.EngineSize L</p>
+                                }
+
+                                @if (listing.Horsepower.HasValue)
+                                {
+                                    <p><strong>Horsepower:</strong> @listing.Horsepower HP</p>
+                                }
+
+                                <div class="row">
+                                    <div class="col-sm-6">
+                                        @if (listing.Doors.HasValue)
+                                        {
+                                            <p><strong>Doors:</strong> @listing.Doors</p>
+                                        }
+                                    </div>
+                                    <div class="col-sm-6">
+                                        @if (listing.Seats.HasValue)
+                                        {
+                                            <p><strong>Seats:</strong> @listing.Seats</p>
+                                        }
+                                    </div>
+                                </div>
+
+                                <p><strong>Condition:</strong> @listing.Condition</p>
+                                @if (!string.IsNullOrEmpty(listing.Location))
+                                {
+                                    <p><strong>Location:</strong> @listing.Location</p>
+                                }
+                                @if (listing.Category != null)
+                                {
+                                    <p><strong>Category:</strong> @listing.Category.CategoryName</p>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        @if (!string.IsNullOrEmpty(listing.Description))
+                        {
+                            <div class="mt-4">
+                                <h5>Description</h5>
+                                <p>@listing.Description</p>
+                            </div>
+                        }
+
+                        <!-- Features -->
+                        @if (!string.IsNullOrEmpty(listing.Features))
+                        {
+                            <div class="mt-3">
+                                <h5>Features</h5>
+                                <p>@listing.Features</p>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="card-footer">
+                        @if (!string.IsNullOrEmpty(successMessage))
+                        {
+                            <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                                @successMessage
+                                <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                                @errorMessage
+                                <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                            </div>
+                        }
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="adminNoteApprove" class="form-label">Approval Note (optional)</label>
+                                    <textarea class="form-control" id="adminNoteApprove" @bind="approvalNote" rows="2"
+                                              placeholder="Add any notes for the seller..."></textarea>
+                                </div>
+                                <button type="button" class="btn btn-success btn-lg w-100" @onclick="ApproveListing" disabled="@isProcessing">
+                                    <i class="fa fa-check me-2"></i>Approve Listing
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="adminNoteReject" class="form-label">Rejection Reason <span class="text-danger">*</span></label>
+                                    <textarea class="form-control" id="adminNoteReject" @bind="rejectionNote" rows="2"
+                                              placeholder="Explain why this listing is being rejected..."></textarea>
+                                </div>
+                                <button type="button" class="btn btn-danger btn-lg w-100" @onclick="RejectListing" disabled="@isProcessing">
+                                    <i class="fa fa-times me-2"></i>Reject Listing
+                                </button>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <a href="/admin/approvals" class="btn btn-outline-secondary">
+                                <i class="fa fa-arrow-left me-2"></i>Back to Pending Approvals
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-danger">
+                    <i class="fa fa-exclamation-triangle me-2"></i>Listing not found.
+                </div>
+                <a href="/admin/approvals" class="btn btn-outline-secondary">
+                    <i class="fa fa-arrow-left me-2"></i>Back to Pending Approvals
+                </a>
+            }
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+<!-- /SECTION -->
+
+@code {
+    [Parameter]
+    public int id { get; set; }
+
+    private CarListingDto? listing;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private string successMessage = "";
+    private string errorMessage = "";
+    private string approvalNote = "";
+    private string rejectionNote = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadListing();
+    }
+
+    private async Task LoadListing()
+    {
+        isLoading = true;
+        try
+        {
+            listing = await CarListingService.GetListingByIdAsync(id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading listing: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+        {
+            return "/images/noimage.jpg";
+        }
+        
+        if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://"))
+        {
+            return imagePath;
+        }
+        
+        var apiBaseUrl = "http://localhost:5237";
+        if (imagePath.StartsWith("/"))
+        {
+            return $"{apiBaseUrl}{imagePath}";
+        }
+        
+        return $"{apiBaseUrl}/images/{imagePath}";
+    }
+
+    private async Task ApproveListing()
+    {
+        if (listing == null) return;
+
+        isProcessing = true;
+        try
+        {
+            var result = await ApprovalService.ApproveListingAsync(id, approvalNote);
+            if (result.Success)
+            {
+                successMessage = $"Listing '{listing.Name}' has been approved successfully!";
+                await Task.Delay(1500);
+                NavManager.NavigateTo("/admin/approvals");
+            }
+            else
+            {
+                errorMessage = $"Failed to approve listing: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error approving listing: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task RejectListing()
+    {
+        if (listing == null) return;
+
+        if (string.IsNullOrWhiteSpace(rejectionNote))
+        {
+            errorMessage = "Please provide a rejection reason.";
+            return;
+        }
+
+        isProcessing = true;
+        try
+        {
+            var result = await ApprovalService.RejectListingAsync(id, rejectionNote);
+            if (result.Success)
+            {
+                successMessage = $"Listing '{listing.Name}' has been rejected.";
+                await Task.Delay(1500);
+                NavManager.NavigateTo("/admin/approvals");
+            }
+            else
+            {
+                errorMessage = $"Failed to reject listing: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error rejecting listing: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}

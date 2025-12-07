@@ -1,0 +1,640 @@
+﻿@page "/"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ICarListingService CarListingService
+@inject ICartService CartService
+@inject IWishlistService WishlistService
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ICompareService CompareService
+
+<PageTitle>Tunis Motors - Home</PageTitle>
+
+<!-- HOME -->
+<div id="home">
+    <!-- container -->
+    <div class="container">
+        <!-- home wrap -->
+        <div class="home-wrap">
+            <!-- home slick -->
+            <div id="home-slick" class="slick-slider">
+                <!-- banner -->
+                <div class="slick-slide">
+                    <div class="banner-container">
+                        <img src="./images/banner01.png" alt="Premium Cars" class="banner-image">
+                        <div class="banner-caption text-center">
+                            <h1>Premium Cars</h1>
+                            <h3 class="white-color font-weak">Up to 50% Discount</h3>
+                            <button class="primary-btn" @onclick='() => Navigation.NavigateTo("/shop")'>Shop Now</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- /banner -->
+
+                <!-- banner -->
+                <div class="slick-slide">
+                    <div class="banner-container">
+                        <img src="./images/banner02.png" alt="Hot Deal" class="banner-image">
+                        <div class="banner-caption">
+                            <h1 class="primary-color">HOT DEAL<br><span class="white-color font-weak">Up to 50% OFF</span></h1>
+                            <button class="primary-btn" @onclick='() => Navigation.NavigateTo("/shop")'>Shop Now</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- /banner -->
+                
+                <div class="slick-slide">
+                    <div class="banner-container">
+                        <img src="./images/banner03.png" alt="Premium Cars" class="banner-image">
+                        <div class="banner-caption text-center">
+                            <h1>Premium Cars</h1>
+                            <h3 class="white-color font-weak">Up to 50% Discount</h3>
+                            <button class="primary-btn" @onclick='() => Navigation.NavigateTo("/shop")'>Shop Now</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /home slick -->
+        </div>
+        <!-- /home wrap -->
+    </div>
+    <!-- /container -->
+</div>
+<!-- /HOME -->
+
+<!-- section -->
+<div class="section">
+    <!-- container -->
+    <div class="container">
+        <!-- row -->
+        <div class="row">
+            <!-- section title -->
+            <div class="col-md-12">
+                <div class="section-title">
+                    <h2 class="title">Featured Cars</h2>
+                    <div class="pull-right">
+                        <div class="product-slick-dots-1 custom-dots"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- section title -->
+
+            <!-- Product Slick -->
+            <div class="col-md-12 col-sm-6 col-xs-6">
+                <div class="row">
+                    <div class="products-tabs">
+                        <!-- tab -->
+                        <div id="tab1" class="tab-pane active">
+                            @if (isLoading)
+                            {
+                                <div class="text-center py-5">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            }
+                            else if (featuredCars != null && featuredCars.Any())
+                            {
+                                <div class="products-slick" data-nav="#slick-nav-1">
+                                    @foreach (var car in featuredCars.Take(5))
+                                    {
+                                        <!-- product -->
+                                        <div class="product">
+                                            <div class="product-img">
+                                                <img src="@GetImageUrl(car.Image)" alt="@car.Name" onerror="this.src='./images/noimage.jpg'">
+                                                <div class="product-label">
+                                                    @if (car.Condition == "New")
+                                                    {
+                                                        <span class="new">NEW</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="sale">USED</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                            <div class="product-body">
+                                                <p class="product-category">@car.Category?.CategoryName</p>
+                                                <h3 class="product-name"><a href="/product/@car.ProductId">@car.Name (@car.Year)</a></h3>
+                                                <h4 class="product-price">@car.Price.ToString("N0") TND</h4>
+                                                <div class="product-rating">
+                                                    @for (int i = 1; i <= 5; i++)
+                                                    {
+                                                        if (i <= car.Rating)
+                                                        {
+                                                            <i class="fa fa-star"></i>
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="fa fa-star-o"></i>
+                                                        }
+                                                    }
+                                                </div>
+                                                <div class="product-btns">
+                                                    <button class="add-to-wishlist" @onclick="() => AddToWishlist(car.ProductId)">
+                                                        <i class="fa-regular fa-heart"></i><span class="tooltipp">add to wishlist</span>
+                                                    </button>
+                                                    <button class="add-to-compare @(compareStatus.ContainsKey(car.Id) && compareStatus[car.Id] ? "active" : "")" 
+                                                            @onclick="() => ToggleCompare(car)" 
+                                                            title="@(compareStatus.ContainsKey(car.Id) && compareStatus[car.Id] ? "Remove from compare" : "Add to compare")">
+                                                        <i class="fa @(compareStatus.ContainsKey(car.Id) && compareStatus[car.Id] ? "fa-check" : "fa-exchange")"></i>
+                                                        <span class="tooltipp">@(compareStatus.ContainsKey(car.Id) && compareStatus[car.Id] ? "in compare" : "add to compare")</span>
+                                                    </button>
+                                                    <button class="quick-view" @onclick="() => QuickView(car.ProductId)">
+                                                        <i class="fa fa-eye"></i><span class="tooltipp">quick view</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="add-to-cart">
+                                                @if (isAuthenticated)
+                                                {
+                                                    <button class="add-to-cart-btn" @onclick="() => AddToCart(car.ProductId)">
+                                                        <i class="fa fa-shopping-cart"></i> add to cart
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <a href="/account/login" class="add-to-cart-btn">
+                                                        <i class="fa fa-sign-in"></i> login to buy
+                                                    </a>
+                                                }
+                                            </div>
+                                        </div>
+                                        <!-- /product -->
+                                    }
+                                </div>
+                                <div id="slick-nav-1" class="products-slick-nav"></div>
+                            }
+                            else
+                            {
+                                <div class="text-center py-5">
+                                    <p class="text-muted">No cars available</p>
+                                </div>
+                            }
+                        </div>
+                        <!-- /tab -->
+                    </div>
+                </div>
+            </div>
+            <!-- /Product Slick -->
+        </div>
+        <!-- /row -->
+    </div>
+    <!-- /container -->
+</div>
+<!-- /section -->
+
+<!-- WHY CHOOSE US SECTION -->
+<div class="section" style="background: #f8f9fa; padding: 80px 0;">
+    <div class="container">
+        <div class="row mb-5">
+            <div class="col-md-12 text-center">
+                <h2 style="font-size: 42px; font-weight: 700; color: #1f2937; margin: 0 0 15px 0;">
+                    Why Choose <span style="color: #dc2626;">Tunisia Motors</span>?
+                </h2>
+                <p style="color: #6b7280; font-size: 18px; max-width: 700px; margin: 0 auto;">
+                    Your trusted partner in finding the perfect vehicle with outstanding service and unbeatable deals
+                </p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <!-- Feature 1 -->
+            <div class="col-lg-3 col-md-6">
+                <div class="text-center" style="padding: 40px 20px; background: white; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.05); transition: all 0.3s ease; height: 100%;">
+                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #dc2626, #991b1b); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 10px 30px rgba(220, 38, 38, 0.3);">
+                        <i class="fa fa-shield-alt" style="font-size: 36px; color: white;"></i>
+                    </div>
+                    <h4 style="color: #1f2937; font-size: 20px; font-weight: 600; margin: 0 0 10px 0;">Verified Listings</h4>
+                    <p style="color: #6b7280; font-size: 15px; margin: 0; line-height: 1.6;">All vehicles are thoroughly inspected and verified for quality assurance</p>
+                </div>
+            </div>
+            
+            <!-- Feature 2 -->
+            <div class="col-lg-3 col-md-6">
+                <div class="text-center" style="padding: 40px 20px; background: white; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.05); transition: all 0.3s ease; height: 100%;">
+                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);">
+                        <i class="fa fa-tags" style="font-size: 36px; color: white;"></i>
+                    </div>
+                    <h4 style="color: #1f2937; font-size: 20px; font-weight: 600; margin: 0 0 10px 0;">Best Prices</h4>
+                    <p style="color: #6b7280; font-size: 15px; margin: 0; line-height: 1.6;">Competitive pricing with transparent deals and no hidden fees</p>
+                </div>
+            </div>
+            
+            <!-- Feature 3 -->
+            <div class="col-lg-3 col-md-6">
+                <div class="text-center" style="padding: 40px 20px; background: white; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.05); transition: all 0.3s ease; height: 100%;">
+                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6, #2563eb); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);">
+                        <i class="fa fa-headset" style="font-size: 36px; color: white;"></i>
+                    </div>
+                    <h4 style="color: #1f2937; font-size: 20px; font-weight: 600; margin: 0 0 10px 0;">24/7 Support</h4>
+                    <p style="color: #6b7280; font-size: 15px; margin: 0; line-height: 1.6;">Expert customer service available round the clock to assist you</p>
+                </div>
+            </div>
+            
+            <!-- Feature 4 -->
+            <div class="col-lg-3 col-md-6">
+                <div class="text-center" style="padding: 40px 20px; background: white; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.05); transition: all 0.3s ease; height: 100%;">
+                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 10px 30px rgba(245, 158, 11, 0.3);">
+                        <i class="fa fa-truck-fast" style="font-size: 36px; color: white;"></i>
+                    </div>
+                    <h4 style="color: #1f2937; font-size: 20px; font-weight: 600; margin: 0 0 10px 0;">Fast Delivery</h4>
+                    <p style="color: #6b7280; font-size: 15px; margin: 0; line-height: 1.6;">Quick and secure delivery of your vehicle right to your doorstep</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /WHY CHOOSE US SECTION -->
+
+<!-- HOT DEAL SECTION -->
+<div id="hot-deal" class="section" style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); position: relative; overflow: hidden;">
+    <!-- Animated background pattern -->
+    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.1; background-image: repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.1) 35px, rgba(255,255,255,.1) 70px);"></div>
+    
+    <!-- container -->
+    <div class="container" style="position: relative; z-index: 1;">
+        <!-- row -->
+        <div class="row align-items-center">
+            <div class="col-md-12">
+                <div class="hot-deal text-center" style="padding: 60px 20px;">
+                    <!-- Countdown Timer -->
+                    <div class="mb-4">
+                        <ul class="hot-deal-countdown" style="display: flex; justify-content: center; gap: 20px; list-style: none; padding: 0; margin: 0 0 30px 0;">
+                            <li style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border-radius: 15px; padding: 20px 25px; min-width: 100px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); transition: transform 0.3s ease;">
+                                <div>
+                                    <h3 style="color: white; font-size: 42px; font-weight: 700; margin: 0 0 5px 0;">02</h3>
+                                    <span style="color: rgba(255,255,255,0.9); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Days</span>
+                                </div>
+                            </li>
+                            <li style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border-radius: 15px; padding: 20px 25px; min-width: 100px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                                <div>
+                                    <h3 style="color: white; font-size: 42px; font-weight: 700; margin: 0 0 5px 0;">10</h3>
+                                    <span style="color: rgba(255,255,255,0.9); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Hours</span>
+                                </div>
+                            </li>
+                            <li style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border-radius: 15px; padding: 20px 25px; min-width: 100px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                                <div>
+                                    <h3 style="color: white; font-size: 42px; font-weight: 700; margin: 0 0 5px 0;">34</h3>
+                                    <span style="color: rgba(255,255,255,0.9); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Mins</span>
+                                </div>
+                            </li>
+                            <li style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border-radius: 15px; padding: 20px 25px; min-width: 100px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                                <div>
+                                    <h3 style="color: white; font-size: 42px; font-weight: 700; margin: 0 0 5px 0;">60</h3>
+                                    <span style="color: rgba(255,255,255,0.9); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Secs</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Heading -->
+                    <h2 style="color: white; font-size: 48px; font-weight: 800; text-transform: uppercase; margin: 0 0 15px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); letter-spacing: 2px;">
+                        🔥 Hot Deal This Week
+                    </h2>
+                    <p style="color: rgba(255,255,255,0.95); font-size: 24px; margin: 0 0 30px 0; font-weight: 500;">
+                        New Collection Up to <span style="font-size: 32px; font-weight: 700; color: #fbbf24;">50% OFF</span>
+                    </p>
+                    
+                    <!-- CTA Button -->
+                    <button class="primary-btn cta-btn" @onclick='() => Navigation.NavigateTo("/shop")' 
+                            style="background: white; color: #dc2626; padding: 18px 50px; font-size: 18px; font-weight: 700; border: none; border-radius: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px;">
+                        <i class="fa fa-car me-2"></i>Browse Cars Now
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- /row -->
+    </div>
+    <!-- /container -->
+</div>
+<!-- /HOT DEAL SECTION -->
+
+<!-- NEWSLETTER -->
+<div id="newsletter" class="section" style="background: linear-gradient(135deg, #1f2937 0%, #111827 100%); position: relative; overflow: hidden;">
+    <!-- Animated background -->
+    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(circle at 20% 50%, rgba(220, 38, 38, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(220, 38, 38, 0.1) 0%, transparent 50%);"></div>
+    
+    <!-- container -->
+    <div class="container" style="position: relative; z-index: 1;">
+        <!-- row -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="newsletter text-center" style="padding: 60px 20px;">
+                    <!-- Icon -->
+                    <div class="mb-4">
+                        <i class="fa fa-envelope" style="font-size: 60px; color: #dc2626; animation: pulse 2s ease-in-out infinite;"></i>
+                    </div>
+                    
+                    <!-- Heading -->
+                    <h3 style="color: white; font-size: 36px; font-weight: 700; margin: 0 0 10px 0;">
+                        Stay Updated with <span style="color: #dc2626;">Tunisia Motors</span>
+                    </h3>
+                    <p style="color: rgba(255,255,255,0.8); font-size: 18px; margin: 0 0 30px 0;">
+                        Get the latest deals, new arrivals, and exclusive offers delivered to your inbox
+                    </p>
+                    
+                    <!-- Form -->
+                    <form @onsubmit="HandleSubscribe" style="max-width: 600px; margin: 0 auto 40px;">
+                        <div class="input-group" style="box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+                            <input class="input form-control" type="email" @bind="email" 
+                                   placeholder="Enter your email address" required
+                                   style="padding: 18px 25px; font-size: 16px; border: none; border-radius: 50px 0 0 50px; background: white;">
+                            <button type="submit" class="btn newsletter-btn" 
+                                    style="background: #dc2626; color: white; padding: 18px 35px; font-size: 16px; font-weight: 600; border: none; border-radius: 0 50px 50px 0; transition: all 0.3s ease;">
+                                <i class="fa fa-paper-plane me-2"></i>Subscribe Now
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <!-- Social Follow -->
+                    <p style="color: rgba(255,255,255,0.7); font-size: 14px; margin: 0 0 20px 0; text-transform: uppercase; letter-spacing: 2px;">
+                        Follow Us On Social Media
+                    </p>
+                    <ul class="newsletter-follow" style="display: flex; justify-content: center; gap: 15px; list-style: none; padding: 0; margin: 0;">
+                        <li>
+                            <a href="#" style="display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; background: rgba(255,255,255,0.1); border-radius: 50%; color: white; font-size: 20px; transition: all 0.3s ease; backdrop-filter: blur(10px);">
+                                <i class="fa-brands fa-facebook"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" style="display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; background: rgba(255,255,255,0.1); border-radius: 50%; color: white; font-size: 20px; transition: all 0.3s ease; backdrop-filter: blur(10px);">
+                                <i class="fa-brands fa-twitter"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" style="display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; background: rgba(255,255,255,0.1); border-radius: 50%; color: white; font-size: 20px; transition: all 0.3s ease; backdrop-filter: blur(10px);">
+                                <i class="fa-brands fa-instagram"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" style="display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; background: rgba(255,255,255,0.1); border-radius: 50%; color: white; font-size: 20px; transition: all 0.3s ease; backdrop-filter: blur(10px);">
+                                <i class="fa-brands fa-linkedin"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <!-- /row -->
+    </div>
+    <!-- /container -->
+</div>
+<!-- /NEWSLETTER -->
+
+<style>
+    @@keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+    
+    .newsletter-btn:hover {
+        background: #991b1b !important;
+        transform: translateX(5px);
+    }
+    
+    .newsletter-follow a:hover {
+        background: #dc2626 !important;
+        transform: translateY(-5px);
+    }
+    
+    .hot-deal-countdown li:hover {
+        transform: translateY(-5px) !important;
+    }
+</style>
+
+<!-- Alert Dialog -->
+<AlertDialog IsVisible="@showAlert"
+             Title="@alertTitle"
+             Message="@alertMessage"
+             Type="@alertType"
+             OnClose="@CloseAlert" />
+
+@code {
+    private List<CarListingDto> featuredCars;
+    private bool isLoading = true;
+    private bool isAuthenticated = false;
+    private string email = string.Empty;
+    private bool showAlert = false;
+    private string alertTitle = "";
+    private string alertMessage = "";
+    private AlertDialog.AlertType alertType = AlertDialog.AlertType.Info;
+    private bool firstRender = true;
+    private Dictionary<int, bool> compareStatus = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Check authentication
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+            
+            // Load featured cars
+            var filter = new CarListingFilterDto { Page = 1, PageSize = 10 };
+            var result = await CarListingService.GetAllListingsAsync(filter);
+            featuredCars = result?.Data ?? new List<CarListingDto>();
+            
+            // Load compare status for all cars
+            foreach (var car in featuredCars)
+            {
+                try
+                {
+                    compareStatus[car.Id] = await CompareService.IsInCompareAsync(car.Id);
+                }
+                catch
+                {
+                    compareStatus[car.Id] = false;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading featured cars: {ex.Message}");
+            featuredCars = new List<CarListingDto>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Initialize sliders every time the page renders (not just first time)
+        try
+        {
+            // Small delay to ensure DOM is ready
+            await Task.Delay(100);
+            
+            // Initialize home slider
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                if (typeof $ !== 'undefined' && typeof $.fn.slick !== 'undefined') {
+                    // Destroy existing slick instance if any
+                    if ($('#home-slick').hasClass('slick-initialized')) {
+                        $('#home-slick').slick('unslick');
+                    }
+                    
+                    // Initialize home slider
+                    $('#home-slick').slick({
+                        autoplay: true,
+                        autoplaySpeed: 4000,
+                        arrows: true,
+                        dots: true,
+                        fade: true,
+                        speed: 1000,
+                        cssEase: 'cubic-bezier(0.7, 0, 0.3, 1)',
+                        pauseOnHover: true,
+                        pauseOnFocus: true
+                    });
+
+                    // Initialize products slider if exists
+                    if ($('.products-slick').length) {
+                        if ($('.products-slick').hasClass('slick-initialized')) {
+                            $('.products-slick').slick('unslick');
+                        }
+                        $('.products-slick').slick({
+                            slidesToShow: 4,
+                            slidesToScroll: 1,
+                            autoplay: true,
+                            autoplaySpeed: 3000,
+                            infinite: true,
+                            speed: 300,
+                            dots: true,
+                            arrows: true,
+                            responsive: [
+                                { breakpoint: 1200, settings: { slidesToShow: 3 } },
+                                { breakpoint: 991, settings: { slidesToShow: 2, dots: false } },
+                                { breakpoint: 768, settings: { slidesToShow: 2, dots: false } },
+                                { breakpoint: 480, settings: { slidesToShow: 1, dots: false, arrows: false } }
+                            ]
+                        });
+                    }
+                }
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing sliders: {ex.Message}");
+        }
+    }
+
+    private async Task AddToWishlist(int carId)
+    {
+        try
+        {
+            var response = await WishlistService.AddToWishlistAsync(carId);
+            if (response)
+            {
+                ShowAlert("Success", "Added to wishlist!", AlertDialog.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert("Error", "Failed to add to wishlist", AlertDialog.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert("Error", ex.Message, AlertDialog.AlertType.Error);
+        }
+    }
+
+    private void QuickView(int carId)
+    {
+        Navigation.NavigateTo($"/product/{carId}");
+    }
+
+    private async Task AddToCart(int carId)
+    {
+        try
+        {
+            var addToCartModel = new AddToCartDto { ProductId = carId, Quantity = 1 };
+            var response = await CartService.AddToCartAsync(addToCartModel);
+            if (response.Success)
+            {
+                ShowAlert("Success", "Added to cart!", AlertDialog.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert("Error", "Failed to add to cart", AlertDialog.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert("Error", ex.Message, AlertDialog.AlertType.Error);
+        }
+    }
+
+    private async Task ToggleCompare(CarListingDto car)
+    {
+        try
+        {
+            var isInCompare = compareStatus.ContainsKey(car.Id) && compareStatus[car.Id];
+            if (isInCompare)
+            {
+                await CompareService.RemoveFromCompareAsync(car.Id);
+                compareStatus[car.Id] = false;
+                ShowAlert("Success", "Removed from compare", AlertDialog.AlertType.Success);
+            }
+            else
+            {
+                var added = await CompareService.AddToCompareAsync(car);
+                if (added)
+                {
+                    compareStatus[car.Id] = true;
+                    ShowAlert("Success", "Added to compare", AlertDialog.AlertType.Success);
+                }
+                else
+                {
+                    ShowAlert("Info", "Compare list is full (max 4 cars). Remove a car first.", AlertDialog.AlertType.Info);
+                }
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ShowAlert("Error", "Error updating compare list.", AlertDialog.AlertType.Error);
+            Console.WriteLine($"Compare error: {ex.Message}");
+        }
+    }
+
+    private void ShowAlert(string title, string message, AlertDialog.AlertType type)
+    {
+        alertTitle = title;
+        alertMessage = message;
+        alertType = type;
+        showAlert = true;
+    }
+
+    private void CloseAlert()
+    {
+        showAlert = false;
+    }
+
+    private async Task HandleSubscribe()
+    {
+        try
+        {
+            email = string.Empty;
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Subscribe error: {ex.Message}");
+        }
+    }
+
+    private string GetImageUrl(string imagePath)
+    {
+        var apiBaseUrl = "http://localhost:5237";
+        if (string.IsNullOrEmpty(imagePath)) return "./images/noimage.jpg";
+        if (imagePath.StartsWith("/images/"))
+            return $"{apiBaseUrl}{imagePath}";
+        return $"{apiBaseUrl}/images/{imagePath}";
+    }
+}

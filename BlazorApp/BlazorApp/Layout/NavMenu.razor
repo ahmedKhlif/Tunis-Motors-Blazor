@@ -1,0 +1,205 @@
+﻿@using System.Timers
+@inject IMessageService MessageService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@implements IDisposable
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">BlazorApp</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <!-- Main Navigation -->
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <i class="fa fa-home"></i> Home
+            </NavLink>
+        </div>
+
+        <!-- Shopping -->
+        <div class="nav-divider my-2"></div>
+        <div class="nav-item px-3">
+            <span class="nav-link" style="cursor: default;">
+                <i class="fa fa-shopping-cart"></i> Shopping
+            </span>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="shop">
+                <i class="fa fa-car"></i> Browse Listings
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="cart">
+                <i class="fa fa-shopping-cart"></i> My Cart
+            </NavLink>
+        </div>
+
+        <!-- Rentals -->
+        <div class="nav-divider my-2"></div>
+        <div class="nav-item px-3">
+            <span class="nav-link" style="cursor: default;">
+                <i class="fa fa-calendar"></i> Rentals
+            </span>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="rentals">
+                <i class="fa fa-car"></i> Rent a Car
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="my-rentals">
+                <i class="fa fa-history"></i> My Rentals
+            </NavLink>
+        </div>
+
+        <!-- Seller Tools -->
+        <div class="nav-divider my-2"></div>
+        <div class="nav-item px-3">
+            <span class="nav-link" style="cursor: default;">
+                <i class="fa fa-plus-circle"></i> Seller
+            </span>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="create-listing">
+                <i class="fa fa-plus"></i> Create Listing
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="my-listings">
+                <i class="fa fa-list"></i> My Listings
+            </NavLink>
+        </div>
+
+        <!-- User Account -->
+        <div class="nav-divider my-2"></div>
+        <div class="nav-item px-3">
+            <span class="nav-link" style="cursor: default;">
+                <i class="fa fa-user"></i> Account
+            </span>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="profile">
+                <i class="fa fa-user-circle"></i> My Profile
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="my-orders">
+                <i class="fa fa-history"></i> My Orders
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="wishlist">
+                <i class="fa fa-heart"></i> Wishlist
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="messages">
+                <i class="fa fa-envelope"></i> Messages
+                @if (unreadCount > 0)
+                {
+                    <span class="badge bg-danger ms-2">@unreadCount</span>
+                }
+            </NavLink>
+        </div>
+
+        <!-- Admin Section -->
+        <div class="nav-divider my-2"></div>
+        <div class="nav-item px-3">
+            <span class="nav-link" style="cursor: default;">
+                <i class="fa fa-lock"></i> Administration
+            </span>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="admin">
+                <i class="fa fa-dashboard"></i> Dashboard
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="admin/approvals">
+                <i class="fa fa-check-circle"></i> Approvals
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="admin/categories">
+                <i class="fa fa-tags"></i> Categories
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="admin/users">
+                <i class="fa fa-users"></i> Users
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="admin/list-roles">
+                <i class="fa fa-user-shield"></i> Roles
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="admin/analytics">
+                <i class="fa fa-bar-chart"></i> Analytics
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="admin/orders">
+                <i class="fa fa-shopping-bag"></i> Order Management
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 ps-4">
+            <NavLink class="nav-link" href="admin/rentals">
+                <i class="fa fa-calendar"></i> Rental Management
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private int unreadCount = 0;
+    private Timer? updateTimer;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateUnreadCount();
+        
+        // Update unread count every 30 seconds
+        updateTimer = new Timer(30000);
+        updateTimer.Elapsed += async (sender, e) => await UpdateUnreadCount();
+        updateTimer.Start();
+    }
+
+    private async Task UpdateUnreadCount()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated == true)
+            {
+                unreadCount = await MessageService.GetUnreadCountAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating unread count: {ex.Message}");
+            unreadCount = 0;
+        }
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    public void Dispose()
+    {
+        updateTimer?.Stop();
+        updateTimer?.Dispose();
+    }
+}

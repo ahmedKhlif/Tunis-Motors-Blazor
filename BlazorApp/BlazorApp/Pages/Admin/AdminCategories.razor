@@ -1,0 +1,507 @@
+@page "/admin/categories"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using Microsoft.AspNetCore.Components.Forms
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject ICategoryService CategoryService
+@inject NavigationManager NavManager
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">Category Management</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/admin">Dashboard</a></li>
+                    <li class="active">Categories</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+        <div class="row">
+            <!-- Create Category Form -->
+            <div class="col-12 mb-4">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fa fa-plus me-2"></i>Add New Category</h5>
+                    </div>
+                    <div class="card-body">
+                        <form @onsubmit="@(async () => await SaveCategory())" enctype="multipart/form-data" class="row g-3">
+                            <div class="col-md-6">
+                                <label for="CategoryName" class="form-label">Category Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="CategoryName" @bind="newCategory.CategoryName" placeholder="Enter category name" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="CategoryDescription" class="form-label">Description (Optional)</label>
+                                <textarea class="form-control" id="CategoryDescription" @bind="newCategory.Description" placeholder="Enter category description" rows="1"></textarea>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Category Image</label>
+                                <div class="border rounded p-3 text-center bg-light" style="border-style: dashed !important; min-height: 150px;"
+                                     @ondragover:preventDefault="true"
+                                     @ondrop:preventDefault="true">
+                                    <InputFile OnChange="OnImageSelected" class="form-control" accept="image/*" id="categoryImageUpload" style="display: none;" />
+                                    <label for="categoryImageUpload" class="d-block mb-0" style="cursor: pointer;">
+                                        @if (!string.IsNullOrEmpty(imagePreview))
+                                        {
+                                            <div class="mb-2">
+                                                <img src="@imagePreview" alt="Preview" class="img-thumbnail" style="max-height: 100px; max-width: 200px;" />
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-danger" @onclick="ClearImage" @onclick:stopPropagation="true">
+                                                <i class="fa fa-times"></i> Remove
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <i class="fa fa-cloud-upload fa-2x text-primary mb-2"></i>
+                                            <p class="mb-1"><strong>Drag and drop image here</strong></p>
+                                            <p class="text-muted small mb-0">or click to browse</p>
+                                            <p class="text-muted small">Max 5MB. Supported: JPG, PNG, GIF</p>
+                                        }
+                                    </label>
+                                </div>
+                                @if (!string.IsNullOrEmpty(imageError))
+                                {
+                                    <div class="alert alert-danger mt-2 mb-0">@imageError</div>
+                                }
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-success" disabled="@isSaving">
+                                    @if (isSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        <span>Saving...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="fa fa-save me-2"></i>
+                                        <span>Create Category</span>
+                                    }
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories Grid -->
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fa fa-tags me-2"></i>All Categories (@categories.Count)</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (isLoading)
+                        {
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading categories...</p>
+                            </div>
+                        }
+                        else if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="fa fa-exclamation-circle me-2"></i>@errorMessage
+                                <button type="button" class="btn-close" @onclick="ClearError"></button>
+                            </div>
+                        }
+                        else if (categories != null && categories.Count > 0)
+                        {
+                            <!-- View Toggle -->
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <small class="text-muted">View: </small>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-primary @(viewMode == "card" ? "active" : "")" @onclick="@(() => viewMode = "card")">
+                                            <i class="fa fa-th"></i> Cards
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary @(viewMode == "list" ? "active" : "")" @onclick="@(() => viewMode = "list")">
+                                            <i class="fa fa-list"></i> List
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <small class="text-muted">@categories.Count categories</small>
+                                </div>
+                            </div>
+
+                            @if (viewMode == "card")
+                            {
+                                <!-- Card View -->
+                                <div class="row">
+                                    @foreach (var category in categories)
+                                    {
+                                        <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+                                            <div class="card h-100 border-0 shadow-sm">
+                                                <div class="card-body text-center">
+                                                    <div class="mb-3">
+                                                        @if (!string.IsNullOrEmpty(category.Image))
+                                                        {
+                                                            <img src="@GetImageUrl(category.Image)" alt="@category.CategoryName" class="img-fluid rounded" style="max-height: 100px; object-fit: cover; width: 100%;" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="fa fa-tag fa-3x text-primary"></i>
+                                                        }
+                                                    </div>
+                                                    <h5 class="card-title mb-2">@category.CategoryName</h5>
+                                                    <p class="text-muted small mb-3">
+                                                        <span class="badge bg-success">@category.ProductCount</span> 
+                                                        @(category.ProductCount == 1 ? "car" : "cars")
+                                                    </p>
+                                                    <div class="btn-group w-100" role="group">
+                                                        <button class="btn btn-outline-primary btn-sm" @onclick="() => EditCategory(category)">
+                                                            <i class="fa fa-edit"></i> Edit
+                                                        </button>
+                                                        <button class="btn btn-outline-info btn-sm" @onclick="() => ViewCategoryDetails(category)">
+                                                            <i class="fa fa-eye"></i> View
+                                                        </button>
+                                                        <button class="btn btn-outline-danger btn-sm" @onclick="() => ConfirmDelete(category)">
+                                                            <i class="fa fa-trash"></i> Delete
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <!-- List View -->
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th width="80">Image</th>
+                                                <th>Category Name</th>
+                                                <th>Cars Count</th>
+                                                <th width="200">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var category in categories)
+                                            {
+                                                <tr>
+                                                    <td>
+                                                        @if (!string.IsNullOrEmpty(category.Image))
+                                                        {
+                                                            <img src="@GetImageUrl(category.Image)" alt="@category.CategoryName" class="rounded" style="width: 60px; height: 40px; object-fit: cover;" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="fa fa-tag fa-2x text-primary"></i>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        <strong>@category.CategoryName</strong>
+                                                        <br />
+                                                        <small class="text-muted">ID: @category.CategoryId</small>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-success">@category.ProductCount</span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <button class="btn btn-outline-primary" @onclick="() => EditCategory(category)">
+                                                                <i class="fa fa-edit"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-info" @onclick="() => ViewCategoryDetails(category)">
+                                                                <i class="fa fa-eye"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-danger" @onclick="() => ConfirmDelete(category)">
+                                                                <i class="fa fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-center py-5">
+                                <i class="fa fa-tags fa-4x text-muted mb-4"></i>
+                                <h4 class="text-muted">No Categories Found</h4>
+                                <p class="text-muted">Start by creating your first category above.</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+@if (categoryToDelete != null)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa fa-exclamation-triangle text-warning me-2"></i>Confirm Deletion</h5>
+                    <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the category <strong>@categoryToDelete.CategoryName</strong>?</p>
+                    <div class="alert alert-warning">
+                        <i class="fa fa-warning me-2"></i>This action cannot be undone.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="DeleteCategoryConfirmed">
+                        <i class="fa fa-trash me-2"></i>Delete Category
+                        </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CategoryDto> categories = new();
+    private CategoryDto newCategory = new();
+    private CategoryDto categoryToDelete = null;
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool showCreateForm = false;
+    private string errorMessage = "";
+    private string imageError = "";
+    private string imagePreview = "";
+    private string viewMode = "card";
+    private IBrowserFile selectedFile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = "";
+            Console.WriteLine("[ADMIN-CATEGORIES] Loading all categories...");
+            categories = await CategoryService.GetAllCategoriesAsync();
+            Console.WriteLine($"[ADMIN-CATEGORIES] Loaded {categories.Count} categories");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading categories: {ex.Message}";
+            Console.WriteLine($"[ADMIN-CATEGORIES] Load error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveCategory()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(newCategory.CategoryName))
+            {
+                errorMessage = "Category name is required";
+                Console.WriteLine("[ADMIN-CATEGORIES] Save failed: name required");
+                return;
+            }
+
+            isSaving = true;
+            errorMessage = "";
+            Console.WriteLine($"[ADMIN-CATEGORIES] Saving new category: {newCategory.CategoryName}");
+            
+            // If a file is selected, upload first and assign returned path
+            if (selectedFile != null)
+            {
+                Console.WriteLine($"[ADMIN-CATEGORIES] Uploading image: {selectedFile.Name} ({FormatFileSize(selectedFile.Size)})");
+                var uploadedPath = await CategoryService.UploadCategoryImageAsync(selectedFile);
+                if (!string.IsNullOrEmpty(uploadedPath))
+                {
+                    newCategory.Image = uploadedPath;
+                    Console.WriteLine($"[ADMIN-CATEGORIES] Image uploaded: {uploadedPath}");
+                }
+                else
+                {
+                    imageError = "Image upload failed";
+                    Console.WriteLine("[ADMIN-CATEGORIES] Image upload returned null path");
+                }
+            }
+            
+            var result = await CategoryService.CreateCategoryAsync(newCategory);
+
+            if (result != null)
+            {
+                Console.WriteLine($"[ADMIN-CATEGORIES] Category created successfully with ID: {result.CategoryId}");
+                await LoadCategories();
+                newCategory = new();
+                selectedFile = null;
+                imagePreview = "";
+                imageError = "";
+            }
+            else
+            {
+                errorMessage = "Error creating category";
+                Console.WriteLine("[ADMIN-CATEGORIES] Create returned null");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+            Console.WriteLine($"[ADMIN-CATEGORIES] Save error: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task OnImageSelected(InputFileChangeEventArgs e)
+    {
+        imageError = "";
+        var file = e.File;
+        
+        if (file == null) 
+        {
+            Console.WriteLine("[ADMIN-CATEGORIES] No file selected");
+            return;
+        }
+
+        Console.WriteLine($"[ADMIN-CATEGORIES] File selected: {file.Name}, Type: {file.ContentType}, Size: {FormatFileSize(file.Size)}");
+
+        // Validate file size (5MB max)
+        const long maxFileSize = 5 * 1024 * 1024;
+        if (file.Size > maxFileSize)
+        {
+            imageError = $"File size must be less than 5MB. Current size: {FormatFileSize(file.Size)}";
+            Console.WriteLine($"[ADMIN-CATEGORIES] File rejected: exceeds size limit");
+            return;
+        }
+
+        // Validate file type
+        var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/gif" };
+        if (!allowedTypes.Contains(file.ContentType.ToLower()))
+        {
+            imageError = "Only JPG, PNG, and GIF images are allowed.";
+            Console.WriteLine($"[ADMIN-CATEGORIES] File rejected: invalid type {file.ContentType}");
+            return;
+        }
+
+        selectedFile = file;
+
+        // Generate preview (first 50KB for performance)
+        try
+        {
+            using var stream = file.OpenReadStream(maxFileSize);
+            var buffer = new byte[Math.Min(50_000, stream.Length)];
+            await stream.ReadAsync(buffer.AsMemory(0, buffer.Length));
+            imagePreview = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer)}";
+            Console.WriteLine("[ADMIN-CATEGORIES] Image preview generated");
+        }
+        catch (Exception ex)
+        {
+            imageError = $"Error loading preview: {ex.Message}";
+            Console.WriteLine($"[ADMIN-CATEGORIES] Preview error: {ex.Message}");
+        }
+    }
+
+    private void ClearImage()
+    {
+        selectedFile = null;
+        imagePreview = "";
+        imageError = "";
+        Console.WriteLine("[ADMIN-CATEGORIES] Image cleared");
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private void EditCategory(CategoryDto category)
+    {
+        Console.WriteLine($"[ADMIN-CATEGORIES] Editing category ID: {category.CategoryId}");
+        NavManager.NavigateTo($"/admin/edit-category/{category.CategoryId}");
+    }
+
+    private void ViewCategoryDetails(CategoryDto category)
+    {
+        Console.WriteLine($"[ADMIN-CATEGORIES] Viewing category ID: {category.CategoryId}");
+        NavManager.NavigateTo($"/category/details/{category.CategoryId}");
+    }
+
+    private void ConfirmDelete(CategoryDto category)
+    {
+        categoryToDelete = category;
+        Console.WriteLine($"[ADMIN-CATEGORIES] Delete confirmation for: {category.CategoryName}");
+    }
+
+    private void CancelDelete()
+    {
+        Console.WriteLine("[ADMIN-CATEGORIES] Delete cancelled");
+        categoryToDelete = null;
+    }
+
+    private void ClearError()
+    {
+        errorMessage = "";
+    }
+
+    private async Task DeleteCategoryConfirmed()
+    {
+        try
+        {
+            if (categoryToDelete == null) return;
+
+            Console.WriteLine($"[ADMIN-CATEGORIES] Deleting category ID: {categoryToDelete.CategoryId}");
+            var success = await CategoryService.DeleteCategoryAsync(categoryToDelete.CategoryId);
+
+            if (success)
+            {
+                Console.WriteLine($"[ADMIN-CATEGORIES] Category deleted successfully");
+                await LoadCategories();
+                categoryToDelete = null;
+            }
+            else
+            {
+                errorMessage = "Error deleting category";
+                Console.WriteLine("[ADMIN-CATEGORIES] Delete failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+            Console.WriteLine($"[ADMIN-CATEGORIES] Delete error: {ex.Message}");
+        }
+    }
+
+    private string GetImageUrl(string imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath)) return "";
+        if (imagePath.StartsWith("http")) return imagePath;
+        return $"http://localhost:5237{imagePath}";
+    }
+}

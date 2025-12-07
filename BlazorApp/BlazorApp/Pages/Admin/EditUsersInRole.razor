@@ -1,0 +1,257 @@
+@page "/admin/edit-users-in-role/{roleId}"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject IAdminService AdminService
+@inject NavigationManager NavigationManager
+
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fa fa-user-cog me-2"></i>Manage Users in Role: @role?.Name</h2>
+                <a href="/admin/list-roles" class="btn btn-outline-secondary">
+                    <i class="fa fa-arrow-left me-2"></i>Back to Roles
+                </a>
+            </div>
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                </div>
+            }
+
+            @if (isLoading)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading users...</p>
+                </div>
+            }
+            else if (role != null && allUsers != null)
+            {
+                <div class="card shadow">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fa fa-users-cog me-2"></i>Assign/Remove Users from Role</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Check the boxes next to users you want to assign to the "@role.Name" role.
+                            Uncheck to remove them from the role.
+                        </p>
+
+                        @if (allUsers.Any())
+                        {
+                            <form @onsubmit="HandleUpdateUsersInRole">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>User</th>
+                                                <th>Email</th>
+                                                <th>Current Roles</th>
+                                                <th class="text-center">In "@role.Name" Role</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var user in allUsers)
+                                            {
+                                                <tr>
+                                                    <td class="fw-medium">@user.UserName</td>
+                                                    <td>@user.Email</td>
+                                                    <td>
+                                                        @if (user.Roles != null && user.Roles.Any())
+                                                        {
+                                                            @foreach (var userRole in user.Roles)
+                                                            {
+                                                                <span class="badge bg-secondary me-1">@userRole</span>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted">No roles</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <div class="form-check d-flex justify-content-center">
+                                                            <input type="checkbox"
+                                                                   class="form-check-input"
+                                                                   id="user_@user.Id"
+                                                                   @bind="userSelections[user.Id]" />
+                                                            <label class="form-check-label ms-2" for="user_@user.Id">
+                                                                @(userSelections.ContainsKey(user.Id) && userSelections[user.Id] ? "Assigned" : "Not Assigned")
+                                                            </label>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center mt-4">
+                                    <div>
+                                        <span class="badge bg-info">@userSelections.Count(u => u.Value) users selected</span>
+                                    </div>
+                                    <div>
+                                        <button type="submit" class="btn btn-primary me-2" disabled="@isSubmitting">
+                                            @if (isSubmitting)
+                                            {
+                                                <text><span class="spinner-border spinner-border-sm me-2" role="status"></span>Updating...</text>
+                                            }
+                                            else
+                                            {
+                                                <text><i class="fa fa-save me-2"></i>Update Role Assignments</text>
+                                            }
+                                        </button>
+                                        <a href="/admin/edit-role/@role.Id" class="btn btn-outline-primary">
+                                            <i class="fa fa-edit me-2"></i>Edit Role Details
+                                        </a>
+                                    </div>
+                                </div>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="text-center py-4">
+                                <i class="fa fa-users fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">No users found in the system.</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-warning">
+                    <i class="fa fa-exclamation-triangle me-2"></i>Role not found or failed to load users.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string RoleId { get; set; }
+
+    private RoleDto role;
+    private List<UserManagementDto> allUsers = new();
+    private Dictionary<string, bool> userSelections = new();
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string successMessage = "";
+    private string errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            role = await AdminService.GetRoleByIdAsync(RoleId);
+            allUsers = await AdminService.GetAllUsersAsync() ?? new List<UserManagementDto>();
+
+            // Initialize selections based on current role assignments
+            userSelections = new Dictionary<string, bool>();
+            var usersInRole = await AdminService.GetUsersInRoleAsync(role?.Name ?? "") ?? new List<UserDto>();
+
+            foreach (var user in allUsers)
+            {
+                userSelections[user.Id] = usersInRole.Any(u => u.Id == user.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load data.";
+            Console.WriteLine($"Load data error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleUpdateUsersInRole()
+    {
+        isSubmitting = true;
+        errorMessage = "";
+        successMessage = "";
+
+        try
+        {
+            var results = new List<string>();
+
+            foreach (var user in allUsers)
+            {
+                var shouldBeInRole = userSelections.ContainsKey(user.Id) && userSelections[user.Id];
+                var isCurrentlyInRole = (await AdminService.GetUsersInRoleAsync(role.Name))
+                    ?.Any(u => u.Id == user.Id) ?? false;
+
+                if (shouldBeInRole && !isCurrentlyInRole)
+                {
+                    // Add to role
+                    var addResult = await AdminService.AddUserToRoleAsync(user.Id, role.Name);
+                    if (addResult.Success)
+                    {
+                        results.Add($"Added {user.UserName} to {role.Name}");
+                    }
+                    else
+                    {
+                        results.Add($"Failed to add {user.UserName}: {addResult.Message}");
+                    }
+                }
+                else if (!shouldBeInRole && isCurrentlyInRole)
+                {
+                    // Remove from role
+                    var removeResult = await AdminService.RemoveUserFromRoleAsync(user.Id, role.Name);
+                    if (removeResult.Success)
+                    {
+                        results.Add($"Removed {user.UserName} from {role.Name}");
+                    }
+                    else
+                    {
+                        results.Add($"Failed to remove {user.UserName}: {removeResult.Message}");
+                    }
+                }
+            }
+
+            if (results.Any())
+            {
+                successMessage = "Role assignments updated:<br/>" + string.Join("<br/>", results);
+            }
+            else
+            {
+                successMessage = "No changes were made to role assignments.";
+            }
+
+            // Refresh data
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Update users in role error: {ex.Message}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

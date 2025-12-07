@@ -1,0 +1,109 @@
+@page "/about"
+@using Microsoft.AspNetCore.Components.Authorization
+
+<PageTitle>About Us - Tunisia Motors</PageTitle>
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">About Us</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-lg-12">
+            <h1 class="display-4 mb-4">About Tunisia Motors</h1>
+            <p class="lead">Your trusted partner for buying and selling quality vehicles in Tunisia.</p>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-lg-6 mb-4">
+            <h2 class="h3 mb-3">Our Story</h2>
+            <p>Tunisia Motors is the leading online marketplace for cars in Tunisia. Founded with a vision to revolutionize the way people buy and sell vehicles, we have grown to become the most trusted platform connecting buyers and sellers across the country.</p>
+            <p>We understand that buying or selling a car is one of the most important decisions you'll make. That's why we've created a platform that makes the process simple, transparent, and secure.</p>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <img src="/images/about.jpg" alt="About Tunisia Motors" class="img-fluid rounded shadow" style="width: 100%; height: 350px; object-fit: cover;">
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-lg-12">
+            <h2 class="h3 mb-4">Why Choose Tunisia Motors?</h2>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fa fa-shield-alt fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Trusted & Secure</h5>
+                    <p class="card-text">All listings are verified and approved by our team to ensure quality and authenticity.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fa fa-users fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">Large Community</h5>
+                    <p class="card-text">Join thousands of satisfied buyers and sellers in our growing marketplace.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fa fa-headset fa-3x text-info mb-3"></i>
+                    <h5 class="card-title">24/7 Support</h5>
+                    <p class="card-text">Our dedicated support team is always available to help you with any questions.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-5 bg-light p-5 rounded">
+        <div class="col-lg-12">
+            <h2 class="h3 mb-4">Our Mission</h2>
+            <p class="mb-3">At Tunisia Motors, our mission is to provide a seamless, transparent, and trustworthy platform for buying and selling vehicles in Tunisia. We strive to:</p>
+            <ul class="list-unstyled">
+                <li class="mb-2"><i class="fa fa-check-circle text-success me-2"></i> Connect genuine buyers with reliable sellers</li>
+                <li class="mb-2"><i class="fa fa-check-circle text-success me-2"></i> Ensure every transaction is safe and secure</li>
+                <li class="mb-2"><i class="fa fa-check-circle text-success me-2"></i> Provide detailed and accurate vehicle information</li>
+                <li class="mb-2"><i class="fa fa-check-circle text-success me-2"></i> Offer exceptional customer service and support</li>
+                <li class="mb-2"><i class="fa fa-check-circle text-success me-2"></i> Make the car buying/selling process simple and enjoyable</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row text-center">
+        <div class="col-lg-12">
+            <h2 class="h3 mb-4">Ready to Get Started?</h2>
+            <p class="mb-4">Whether you're looking to buy your dream car or sell your current vehicle, Tunisia Motors is here to help.</p>
+            <AuthorizeView>
+                <Authorized>
+                    <a href="/shop" class="btn btn-primary btn-lg me-2"><i class="fa fa-car me-2"></i>Browse Cars</a>
+                    <a href="/dashboard" class="btn btn-outline-primary btn-lg"><i class="fa fa-plus me-2"></i>List Your Car</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/shop" class="btn btn-primary btn-lg me-2"><i class="fa fa-car me-2"></i>Browse Cars</a>
+                    <a href="/register" class="btn btn-outline-primary btn-lg"><i class="fa fa-user-plus me-2"></i>Create Account</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: transform 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+    }
+</style>

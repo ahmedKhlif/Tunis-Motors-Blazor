@@ -1,0 +1,342 @@
+@page "/my-orders"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IOrderService OrderService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavManager
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">My Orders</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/profile">Profile</a></li>
+                    <li class="active">My Orders</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fa fa-shopping-bag me-2"></i>My Orders (@totalOrders)</h5>
+                        <div class="d-flex gap-2">
+                            <select @bind="statusFilter" class="form-select me-2" style="min-width: 150px; background: white; color: black;">
+                                <option value="">All Statuses</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="Processing">Processing</option>
+                                <option value="Shipped">Shipped</option>
+                                <option value="Delivered">Delivered</option>
+                                <option value="Cancelled">Cancelled</option>
+                                <option value="Refunded">Refunded</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-light" @onclick="ApplyFilters">
+                                <i class="fa fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(successMessage))
+                        {
+                            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                @successMessage
+                                <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                @errorMessage
+                                <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                            </div>
+                        }
+
+                        @if (isLoading)
+                        {
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading your orders...</p>
+                            </div>
+                        }
+                        else if (orders != null && orders.Data.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Order #</th>
+                                            <th>Total Amount</th>
+                                            <th>Status</th>
+                                            <th>Date</th>
+                                            <th>Items</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var order in orders.Data)
+                                        {
+                                            <tr>
+                                                <td><strong>#@order.Id</strong></td>
+                                                <td><strong>@order.TotalAmount.ToString("N0") TND</strong></td>
+                                                <td>
+                                                    @if (order.Status == "Pending")
+                                                    {
+                                                        <span class="badge bg-warning text-dark">@order.Status</span>
+                                                    }
+                                                    else if (order.Status == "Confirmed" || order.Status == "Processing")
+                                                    {
+                                                        <span class="badge bg-info">@order.Status</span>
+                                                    }
+                                                    else if (order.Status == "Shipped")
+                                                    {
+                                                        <span class="badge bg-primary">@order.Status</span>
+                                                    }
+                                                    else if (order.Status == "Delivered")
+                                                    {
+                                                        <span class="badge bg-success">@order.Status</span>
+                                                    }
+                                                    else if (order.Status == "Cancelled")
+                                                    {
+                                                        <span class="badge bg-danger">@order.Status</span>
+                                                    }
+                                                    else if (order.Status == "Refunded")
+                                                    {
+                                                        <span class="badge bg-secondary">@order.Status</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">@order.Status</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <small>@order.OrderDate.ToString("MMM dd, yyyy")</small>
+                                                    <br />
+                                                    <small class="text-muted">@order.OrderDate.ToString("hh:mm tt")</small>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-secondary">@(order.Items?.Count ?? 0) items</span>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        <button class="btn btn-outline-primary" @onclick="() => ViewDetails(order.Id)">
+                                                            <i class="fa fa-eye"></i> View
+                                                        </button>
+                                                        @if (order.Status != "Cancelled" && order.Status != "Delivered" && order.Status != "Refunded")
+                                                        {
+                                                            <button class="btn btn-outline-danger" @onclick="() => ShowCancelModal(order.Id)">
+                                                                <i class="fa fa-times"></i> Cancel
+                                                            </button>
+                                                        }
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Pagination -->
+                            @if (totalPages > 1)
+                            {
+                                <nav aria-label="Page navigation" class="mt-3">
+                                    <ul class="pagination justify-content-center">
+                                        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
+                                        </li>
+                                        @for (int i = 1; i <= totalPages; i++)
+                                        {
+                                            var pageNum = i;
+                                            <li class="page-item @(currentPage == pageNum ? "active" : "")">
+                                                <button class="page-link" @onclick="() => GoToPage(pageNum)">@pageNum</button>
+                                            </li>
+                                        }
+                                        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage + 1)">Next</button>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-center py-5">
+                                <i class="fa fa-shopping-bag fa-4x text-muted mb-3"></i>
+                                <h4 class="text-muted">No orders yet</h4>
+                                <p class="text-muted">You haven't made any purchases yet. Start shopping now!</p>
+                                <a href="/shop" class="btn btn-primary mt-3">Browse Cars</a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Order Modal -->
+@if (showCancelModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Cancel Order</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseCancelModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fa fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> This action will cancel your order.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cancellation Reason</label>
+                        <textarea class="form-control" @bind="cancelReason" rows="3" placeholder="Tell us why you're cancelling..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseCancelModal">Close</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmCancelOrder" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Cancel Order
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private PaginatedDto<OrderDto> orders;
+    private int currentPage = 1;
+    private int totalPages => orders?.TotalPages ?? 1;
+    private int totalOrders => orders?.TotalCount ?? 0;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private string currentUserId;
+    private string successMessage = "";
+    private string errorMessage = "";
+    private string statusFilter = "";
+
+    // Cancel modal
+    private bool showCancelModal = false;
+    private int selectedOrderId = 0;
+    private string cancelReason = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(currentUserId))
+        {
+            NavManager.NavigateTo("/login");
+            return;
+        }
+
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        isLoading = true;
+        try
+        {
+            orders = await OrderService.GetUserOrdersAsync(currentPage);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load your orders.";
+            Console.WriteLine($"Error loading orders: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        currentPage = 1;
+        await LoadOrders();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > totalPages) return;
+        currentPage = page;
+        await LoadOrders();
+    }
+
+    private void ViewDetails(int orderId)
+    {
+        NavManager.NavigateTo($"/order/details/{orderId}");
+    }
+
+    private void ShowCancelModal(int orderId)
+    {
+        selectedOrderId = orderId;
+        cancelReason = "";
+        showCancelModal = true;
+    }
+
+    private void CloseCancelModal()
+    {
+        showCancelModal = false;
+        selectedOrderId = 0;
+        cancelReason = "";
+    }
+
+    private async Task ConfirmCancelOrder()
+    {
+        if (string.IsNullOrEmpty(cancelReason))
+        {
+            errorMessage = "Please provide a cancellation reason.";
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            var success = await OrderService.CancelOrderAsync(selectedOrderId, cancelReason);
+            
+            if (success)
+            {
+                successMessage = "Order cancelled successfully!";
+                CloseCancelModal();
+                await LoadOrders();
+            }
+            else
+            {
+                errorMessage = "Failed to cancel order.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred while cancelling the order.";
+            Console.WriteLine($"Error cancelling order: {ex.Message}");
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}

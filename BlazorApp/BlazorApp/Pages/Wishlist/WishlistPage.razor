@@ -1,0 +1,341 @@
+@page "/wishlist"
+@using BlazorApp.Services
+@using BlazorApp.Models
+@inject IWishlistService WishlistService
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+
+<!-- BREADCRUMB -->
+<div id="breadcrumb" class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="breadcrumb-header">My Wishlist</h3>
+                <ul class="breadcrumb-tree">
+                    <li><a href="/">Home</a></li>
+                    <li class="active">My Wishlist</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /BREADCRUMB -->
+
+<!-- SECTION -->
+<div class="section">
+    <div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fa fa-heart"></i> My Wishlist</h1>
+        <a href="/shop" class="btn btn-outline-primary">
+            <i class="fa fa-arrow-left me-2"></i> Continue Shopping
+        </a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (wishlistItems == null || wishlistItems.Count == 0)
+    {
+        <div class="alert alert-info">
+            <div class="text-center py-4">
+                <i class="fa fa-heart fa-3x text-muted mb-3"></i>
+                <h5>Your Wishlist is Empty</h5>
+                <p class="text-muted mb-3">Start adding your favorite cars to your wishlist!</p>
+                <a href="/shop" class="btn btn-primary">
+                    <i class="fa fa-search me-2"></i> Browse Cars
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var item in wishlistItems)
+            {
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <div class="card h-100 shadow-sm hover-card">
+                        <!-- Car Image -->
+                        <div class="position-relative overflow-hidden" style="height: 250px;">
+                            @if (!string.IsNullOrEmpty(item.Image))
+                            {
+                                <img src="@GetImageUrl(item.Image)" class="card-img-top" alt="@item.Name" style="object-fit: cover; height: 100%;" >
+                            }
+                            else
+                            {
+                                <div class="bg-light d-flex align-items-center justify-content-center h-100">
+                                    <i class="fa fa-image fa-3x text-muted"></i>
+                                </div>
+                            }
+                            
+                            <!-- Remove from Wishlist Button (Heart Icon) -->
+                            <button class="btn btn-link position-absolute top-0 end-0 m-2 p-0" 
+                                    style="font-size: 1.5rem; z-index: 10;"
+                                    @onclick="() => RemoveFromWishlist(item.ProductId)"
+                                    title="Remove from wishlist"
+                                    disabled="@isRemoving">
+                                <i class="fa fa-heart text-danger" style="text-shadow: 0 0 3px rgba(255,255,255,0.8);"></i>
+                            </button>
+
+                            <!-- Price Badge -->
+                            <div class="position-absolute bottom-0 start-0 m-2">
+                                <span class="badge bg-danger fs-6">
+                                    @item.Price.ToString("N0") TND
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Card Body -->
+                        <div class="card-body d-flex flex-column">
+                            <!-- Car Name and Brand -->
+                            <h5 class="card-title">@item.Name</h5>
+                            <p class="text-muted mb-2 small">@item.Brand</p>
+
+                            <!-- Car Details -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-2 small">
+                                    <span><i class="fa fa-calendar text-primary me-1"></i> @(item.Year >= 1900 ? item.Year.ToString() : "—")</span>
+                                    <span><i class="fa fa-cogs text-primary me-1"></i> @(string.IsNullOrWhiteSpace(item.Transmission) ? "—" : item.Transmission)</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 small">
+                                    <span><i class="fa fa-tachometer-alt text-primary me-1"></i> @(item.Mileage > 0 ? item.Mileage.ToString("N0") + " km" : "—")</span>
+                                    <span><i class="fa fa-droplet text-primary me-1"></i> @(string.IsNullOrWhiteSpace(item.FuelType) ? "—" : item.FuelType)</span>
+                                </div>
+                                <div class="d-flex align-items-center small">
+                                    @{
+                                        var badgeClass = item.Condition == "New" ? "bg-success" : item.Condition == "Used" ? "bg-warning" : "bg-info";
+                                    }
+                                    <span class="badge @badgeClass">
+                                        @(string.IsNullOrWhiteSpace(item.Condition) ? "Used" : item.Condition)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Description -->
+                            <p class="card-text text-muted small flex-grow-1">
+                                @if (!string.IsNullOrEmpty(item.Description) && item.Description.Length > 60)
+                                {
+                                    @item.Description.Substring(0, 60)<text>...</text>
+                                }
+                                else
+                                {
+                                    @item.Description
+                                }
+                            </p>
+
+                            <!-- Action Buttons -->
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" 
+                                    @onclick="() => AddToCart(item)"
+                                    disabled="@isAdding">
+                                    @if (isAdding)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    <i class="fa fa-shopping-cart me-2"></i> Add to Cart
+                                </button>
+                                <a href="/product/@item.ProductId" class="btn btn-outline-secondary">
+                                    <i class="fa fa-eye"></i> View Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Summary Section -->
+    @if (wishlistItems != null && wishlistItems.Count > 0)
+    {
+        <div class="row mt-5">
+            <div class="col-md-12">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title">Wishlist Summary</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <p class="mb-0"><strong>Total Items:</strong> @wishlistItems.Count</p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="mb-0"><strong>Total Value:</strong> @wishlistItems.Sum(x => x.Price).ToString("N0") TND</p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="mb-0"><strong>Average Price:</strong> @(wishlistItems.Any() ? wishlistItems.Average(x => x.Price).ToString("N0") + " TND" : "N/A")</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            <i class="fa fa-check-circle me-2"></i> @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            <i class="fa fa-exclamation-circle me-2"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+    </div>
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .hover-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .position-relative {
+        position: relative;
+    }
+
+    .overflow-hidden {
+        overflow: hidden;
+    }
+</style>
+
+@code {
+    private List<CarListingDto> wishlistItems = new();
+    private bool isLoading = true;
+    private bool isAdding = false;
+    private bool isRemoving = false;
+    private string errorMessage = "";
+    private string successMessage = "";
+    private UserDto currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            currentUser = await AuthService.GetCurrentUserAsync();
+            if (currentUser == null)
+            {
+                NavigationManager.NavigateTo("/login");
+                return;
+            }
+
+            await LoadWishlist();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading wishlist: {ex.Message}";
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadWishlist()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = "";
+            
+            var result = await WishlistService.GetMyWishlistAsync();
+            wishlistItems = result?.Select(w => w.CarListing).Where(c => c != null).ToList() ?? new List<CarListingDto>();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading wishlist: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RemoveFromWishlist(int carListingId)
+    {
+        try
+        {
+            isRemoving = true;
+            errorMessage = "";
+
+            var result = await WishlistService.RemoveFromWishlistAsync(carListingId);
+            if (result)
+            {
+                wishlistItems.RemoveAll(x => x.ProductId == carListingId);
+                successMessage = "Item removed from wishlist";
+                await Task.Delay(2000);
+                successMessage = "";
+            }
+            else
+            {
+                errorMessage = "Failed to remove item from wishlist";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error removing from wishlist: {ex.Message}";
+        }
+        finally
+        {
+            isRemoving = false;
+        }
+    }
+
+    private async Task AddToCart(CarListingDto item)
+    {
+        try
+        {
+            isAdding = true;
+            errorMessage = "";
+
+            // Navigate to product details where user can add to cart
+            NavigationManager.NavigateTo($"/product/{item.ProductId}");
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isAdding = false;
+        }
+    }
+
+    private async Task<List<dynamic>> GetCartFromLocalStorage()
+    {
+        // Cart managed via backend API
+        await Task.CompletedTask;
+        return new List<dynamic>();
+    }
+
+    private async Task SaveCartToLocalStorage(List<dynamic> cart)
+    {
+        // Cart managed via backend API
+        await Task.CompletedTask;
+    }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+            return "/images/noimage.jpg";
+        
+        if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://"))
+            return imagePath;
+        
+        var apiBaseUrl = "http://localhost:5237";
+        if (imagePath.StartsWith("/"))
+            return $"{apiBaseUrl}{imagePath}";
+        
+        return $"{apiBaseUrl}/images/{imagePath}";
+    }
+}

@@ -1,0 +1,128 @@
+@* Duplicate route - use Order/Index.razor instead *@
+@* @page "/admin/orders" *@
+@using BlazorApp.Services
+@using BlazorApp.Models
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject IOrderService OrderService
+@inject NavigationManager NavManager
+
+<div class="container-fluid mt-4">
+    <h2>Manage Orders (Old Version - Disabled)</h2>
+
+    <div class="mb-3">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="Search orders..." @bind="searchTerm" />
+            <select class="form-control" @bind="selectedStatus">
+                <option value="">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="Processing">Processing</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Cancelled">Cancelled</option>
+            </select>
+            <button class="btn btn-primary" @onclick="SearchOrders">Search</button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <p>Loading orders...</p>
+    }
+    else if (orders?.Data != null && orders.Data.Count > 0)
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in orders.Data)
+                    {
+                        <tr>
+                            <td>#@order.Id</td>
+                            <td>@order.CustomerName</td>
+                            <td>@order.TotalAmount.ToString("C")</td>
+                            <td>
+                                <span class="badge bg-info">@order.Status</span>
+                            </td>
+                            <td>@order.OrderDate.ToString("g")</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" @onclick="() => ViewOrder(order.Id)">
+                                    View
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <nav>
+            <ul class="pagination justify-content-center">
+                <li class="page-item @(orders.PageNumber == 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => ChangePage(orders.PageNumber - 1)">Previous</button>
+                </li>
+                @for (int i = 1; i <= orders.TotalPages; i++)
+                {
+                    int pageNum = i;
+                    <li class="page-item @(orders.PageNumber == pageNum ? "active" : "")">
+                        <button class="page-link" @onclick="() => ChangePage(pageNum)">@pageNum</button>
+                    </li>
+                }
+                <li class="page-item @(!orders.HasNextPage ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => ChangePage(orders.PageNumber + 1)">Next</button>
+                </li>
+            </ul>
+        </nav>
+    }
+    else
+    {
+        <p>No orders found.</p>
+    }
+</div>
+
+@code {
+    private PaginatedDto<OrderDto> orders = new();
+    private string searchTerm = "";
+    private string selectedStatus = "";
+    private bool isLoading = true;
+    private int currentPage = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        isLoading = true;
+        orders = await OrderService.FilterOrdersAsync(selectedStatus, searchTerm, currentPage);
+        isLoading = false;
+    }
+
+    private async Task SearchOrders()
+    {
+        currentPage = 1;
+        await LoadOrders();
+    }
+
+    private async Task ChangePage(int pageNumber)
+    {
+        currentPage = pageNumber;
+        await LoadOrders();
+    }
+
+    private void ViewOrder(int orderId)
+    {
+        NavManager.NavigateTo($"/order/{orderId}");
+    }
+}

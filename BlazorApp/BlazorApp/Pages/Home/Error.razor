@@ -1,0 +1,52 @@
+@page "/error"
+<PageTitle>Error - Tunisia Motors</PageTitle>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="text-center">
+                <div class="mb-4">
+                    <i class="fa fa-exclamation-triangle fa-5x text-warning"></i>
+                </div>
+                <h1 class="display-4 text-danger mb-3">Oops! Something went wrong</h1>
+                <p class="lead text-muted mb-4">
+                    We're sorry, but something unexpected happened. Please try again or contact support if the problem persists.
+                </p>
+
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">What you can do:</h5>
+                        <ul class="list-unstyled text-start">
+                            <li class="mb-2"><i class="fa fa-refresh me-2 text-primary"></i>Refresh the page</li>
+                            <li class="mb-2"><i class="fa fa-home me-2 text-primary"></i>Go back to the homepage</li>
+                            <li class="mb-2"><i class="fa fa-envelope me-2 text-primary"></i>Contact our support team</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="btn-group" role="group">
+                    <button class="btn btn-primary" @onclick="RefreshPage">
+                        <i class="fa fa-refresh me-2"></i>Try Again
+                    </button>
+                    <a href="/" class="btn btn-outline-primary">
+                        <i class="fa fa-home me-2"></i>Go Home
+                    </a>
+                    <a href="mailto:contact@carecommerce.tn" class="btn btn-outline-secondary">
+                        <i class="fa fa-envelope me-2"></i>Contact Support
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private void RefreshPage()
+    {
+        // This will refresh the current page
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+    }
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; }
+}
