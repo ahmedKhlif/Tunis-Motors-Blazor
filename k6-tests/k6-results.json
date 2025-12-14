@@ -1,0 +1,18 @@
+﻿{
+    "ErrorRate":  0,
+    "SuccessRate":  100,
+    "AverageResponseTime":  19.88,
+    "FailedRequests":  0,
+    "TotalRequests":  30,
+    "P95ResponseTime":  37.74,
+    "P99ResponseTime":  53.51,
+    "Thresholds":  {
+                       "P99Under1000":  true,
+                       "ErrorRateUnder1":  true,
+                       "P95Under500":  true
+                   },
+    "MaxResponseTime":  53.51,
+    "SuccessfulRequests":  30,
+    "MinResponseTime":  10.49,
+    "Timestamp":  "2025-12-13 22:18:25"
+}

@@ -1,0 +1,44 @@
+﻿[
+    {
+        "ErrorRate":  0,
+        "SuccessRate":  100,
+        "AverageResponseTime":  17.83,
+        "FailedRequests":  0,
+        "TotalRequests":  30,
+        "P95ResponseTime":  25.25,
+        "Run":  1,
+        "P99ResponseTime":  36.93,
+        "MaxResponseTime":  36.93,
+        "SuccessfulRequests":  30,
+        "MinResponseTime":  13.03,
+        "Timestamp":  "2025-12-13 22:30:52"
+    },
+    {
+        "ErrorRate":  0,
+        "SuccessRate":  100,
+        "AverageResponseTime":  15.9,
+        "FailedRequests":  0,
+        "TotalRequests":  30,
+        "P95ResponseTime":  20.15,
+        "Run":  2,
+        "P99ResponseTime":  21.67,
+        "MaxResponseTime":  21.67,
+        "SuccessfulRequests":  30,
+        "MinResponseTime":  13.02,
+        "Timestamp":  "2025-12-13 22:30:56"
+    },
+    {
+        "ErrorRate":  0,
+        "SuccessRate":  100,
+        "AverageResponseTime":  19.84,
+        "FailedRequests":  0,
+        "TotalRequests":  30,
+        "P95ResponseTime":  42.12,
+        "Run":  3,
+        "P99ResponseTime":  50.71,
+        "MaxResponseTime":  50.71,
+        "SuccessfulRequests":  30,
+        "MinResponseTime":  12.63,
+        "Timestamp":  "2025-12-13 22:31:01"
+    }
+]

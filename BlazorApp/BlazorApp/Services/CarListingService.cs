@@ -23,6 +23,7 @@ namespace BlazorApp.Services
     public class CarListingService : ICarListingService
     {
         private readonly IApiClient _apiClient;
+        private readonly HttpClient _httpClient;
 
         public CarListingService(IApiClient apiClient)
         {
@@ -122,6 +123,12 @@ namespace BlazorApp.Services
                 var fileList = files.ToList();
                 Console.WriteLine($"[UploadImages] Processing {fileList.Count} files");
                 
+                // Ensure baseUrl ends with /
+                if (!baseUrl.EndsWith("/"))
+                {
+                    baseUrl += "/";
+                }
+                
                 using var httpClient = new HttpClient();
                 httpClient.BaseAddress = new Uri(baseUrl);
                 httpClient.Timeout = TimeSpan.FromMinutes(5); // Increase timeout for large files
@@ -138,66 +145,192 @@ namespace BlazorApp.Services
                 {
                     Console.WriteLine("[UploadImages] WARNING: No auth token available");
                 }
+                
+                // Clear any existing headers that might interfere
+                httpClient.DefaultRequestHeaders.Clear();
+                if (!string.IsNullOrEmpty(token))
+                {
+                    httpClient.DefaultRequestHeaders.Authorization = 
+                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                }
 
                 using var content = new MultipartFormDataContent();
+                var memoryStreams = new List<System.IO.MemoryStream>(); // Keep streams alive until request completes
                 
                 foreach (var file in fileList)
                 {
                     Console.WriteLine($"[UploadImages] Adding file: {file.Name}, Size: {file.Size} bytes, Type: {file.ContentType}");
                     try
                     {
-                        var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024));
-                        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+                        // Validate file size before reading
+                        if (file.Size > 10 * 1024 * 1024)
+                        {
+                            Console.WriteLine($"[UploadImages] ERROR: File {file.Name} exceeds 10MB limit (Size: {file.Size} bytes)");
+                            continue;
+                        }
+
+                        // Validate file extension
+                        var fileName = file.Name.ToLowerInvariant();
+                        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+                        var hasValidExtension = allowedExtensions.Any(ext => fileName.EndsWith(ext));
+                        if (!hasValidExtension)
+                        {
+                            Console.WriteLine($"[UploadImages] ERROR: File {file.Name} has invalid extension");
+                            continue;
+                        }
+
+                        // Read file stream into memory to avoid stream closure issues
+                        using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                        var memoryStream = new System.IO.MemoryStream();
+                        await stream.CopyToAsync(memoryStream);
+                        memoryStream.Position = 0;
+                        memoryStreams.Add(memoryStream); // Keep reference to prevent disposal
+                        
+                        var fileContent = new StreamContent(memoryStream);
+                        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType ?? "image/jpeg");
+                        
+                        // Use "files" as parameter name for IFormFileCollection binding
+                        // ASP.NET Core expects files to be named "files" for IFormFileCollection
                         content.Add(fileContent, "files", file.Name);
-                        Console.WriteLine($"[UploadImages] File {file.Name} added to multipart content");
+                        Console.WriteLine($"[UploadImages] File {file.Name} added to multipart content (Size: {file.Size} bytes, Type: {file.ContentType ?? "image/jpeg"})");
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"[UploadImages] ERROR adding file {file.Name}: {ex.Message}");
+                        Console.WriteLine($"[UploadImages] Stack trace: {ex.StackTrace}");
                     }
+                }
+
+                if (content.Count() == 0)
+                {
+                    Console.WriteLine("[UploadImages] ERROR: No valid files to upload");
+                    // Dispose memory streams
+                    foreach (var ms in memoryStreams)
+                    {
+                        ms.Dispose();
+                    }
+                    return null;
                 }
 
                 var uploadUrl = $"{baseUrl}api/carlistings/upload-images";
                 Console.WriteLine($"[UploadImages] Posting to: {uploadUrl}");
-                Console.WriteLine($"[UploadImages] Content length: {content.Headers.ContentLength} bytes");
+                Console.WriteLine($"[UploadImages] Content parts count: {content.Count()}");
+                Console.WriteLine($"[UploadImages] Content length: {content.Headers.ContentLength?.ToString() ?? "unknown"} bytes");
                 
-                var response = await httpClient.PostAsync("api/carlistings/upload-images", content);
+                HttpResponseMessage? response = null;
+                try
+                {
+                    response = await httpClient.PostAsync("api/carlistings/upload-images", content);
+                    Console.WriteLine($"[UploadImages] Response status: {response.StatusCode}");
+                }
+                catch (HttpRequestException httpEx)
+                {
+                    Console.WriteLine($"[UploadImages] HTTP REQUEST EXCEPTION: {httpEx.Message}");
+                    Console.WriteLine($"[UploadImages] Inner exception: {httpEx.InnerException?.Message}");
+                    Console.WriteLine($"[UploadImages] Stack trace: {httpEx.StackTrace}");
+                    // Dispose memory streams on error
+                    foreach (var ms in memoryStreams)
+                    {
+                        ms.Dispose();
+                    }
+                    throw; // Re-throw to be caught by outer catch
+                }
+                catch (TaskCanceledException timeoutEx)
+                {
+                    Console.WriteLine($"[UploadImages] TIMEOUT EXCEPTION: {timeoutEx.Message}");
+                    Console.WriteLine($"[UploadImages] The upload request timed out. Please try with smaller files or check your connection.");
+                    // Dispose memory streams on error
+                    foreach (var ms in memoryStreams)
+                    {
+                        ms.Dispose();
+                    }
+                    throw; // Re-throw to be caught by outer catch
+                }
+                finally
+                {
+                    // Dispose memory streams after request completes
+                    foreach (var ms in memoryStreams)
+                    {
+                        ms.Dispose();
+                    }
+                }
                 
-                Console.WriteLine($"[UploadImages] Response status: {response.StatusCode}");
+                if (response == null)
+                {
+                    Console.WriteLine("[UploadImages] ERROR: Response is null");
+                    return null;
+                }
+                
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[UploadImages] Response content: {responseContent}");
                 
                 if (response.IsSuccessStatusCode)
                 {
-                    var jsonResponse = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"[UploadImages] Success response: {jsonResponse}");
-                    var apiResponse = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<List<string>>>(jsonResponse, 
-                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                    
-                    if (apiResponse?.Data != null)
+                    try
                     {
-                        Console.WriteLine($"[UploadImages] Successfully uploaded {apiResponse.Data.Count} images:");
-                        foreach (var path in apiResponse.Data)
+                        var apiResponse = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<List<string>>>(responseContent, 
+                            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        
+                        if (apiResponse?.Data != null && apiResponse.Data.Any())
                         {
-                            Console.WriteLine($"[UploadImages]   - {path}");
+                            Console.WriteLine($"[UploadImages] Successfully uploaded {apiResponse.Data.Count} images:");
+                            foreach (var path in apiResponse.Data)
+                            {
+                                Console.WriteLine($"[UploadImages]   - {path}");
+                            }
+                            return apiResponse.Data;
+                        }
+                        else
+                        {
+                            Console.WriteLine("[UploadImages] WARNING: Response data is null or empty");
+                            Console.WriteLine($"[UploadImages] API Response Success: {apiResponse?.Success}");
+                            Console.WriteLine($"[UploadImages] API Response Message: {apiResponse?.Message}");
                         }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Console.WriteLine("[UploadImages] WARNING: Response data is null");
+                        Console.WriteLine($"[UploadImages] ERROR deserializing response: {ex.Message}");
+                        Console.WriteLine($"[UploadImages] Response content: {responseContent}");
                     }
-                    
-                    return apiResponse?.Data;
                 }
                 else
                 {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"[UploadImages] ERROR {response.StatusCode}: {errorContent}");
+                    Console.WriteLine($"[UploadImages] ERROR {response.StatusCode}: {responseContent}");
+                    
+                    // Try to extract error message from response
+                    string errorMessage = $"Upload failed with status {response.StatusCode}";
+                    try
+                    {
+                        var errorResponse = System.Text.Json.JsonSerializer.Deserialize<ApiResponse>(responseContent, 
+                            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (errorResponse?.Message != null)
+                        {
+                            errorMessage = errorResponse.Message;
+                        }
+                    }
+                    catch { }
+                    
+                    Console.WriteLine($"[UploadImages] Error message: {errorMessage}");
                 }
                 
+                return null;
+            }
+            catch (HttpRequestException httpEx)
+            {
+                Console.WriteLine($"[UploadImages] HTTP EXCEPTION: {httpEx.Message}");
+                Console.WriteLine($"[UploadImages] Stack trace: {httpEx.StackTrace}");
+                return null;
+            }
+            catch (TaskCanceledException timeoutEx)
+            {
+                Console.WriteLine($"[UploadImages] TIMEOUT EXCEPTION: {timeoutEx.Message}");
+                Console.WriteLine($"[UploadImages] The upload request timed out. Please try with smaller files or check your connection.");
                 return null;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[UploadImages] EXCEPTION: {ex.Message}");
+                Console.WriteLine($"[UploadImages] Type: {ex.GetType().Name}");
                 Console.WriteLine($"[UploadImages] Stack trace: {ex.StackTrace}");
                 return null;
             }

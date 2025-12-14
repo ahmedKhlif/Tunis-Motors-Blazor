@@ -1,0 +1,30 @@
+﻿[
+    {
+        "ErrorRate":  0,
+        "SuccessRate":  100,
+        "AverageResponseTime":  19.42,
+        "FailedRequests":  0,
+        "TotalRequests":  25,
+        "P95ResponseTime":  37.06,
+        "Run":  1,
+        "P99ResponseTime":  72.63,
+        "MaxResponseTime":  72.63,
+        "SuccessfulRequests":  25,
+        "MinResponseTime":  13.11,
+        "Timestamp":  "2025-12-13 22:29:24"
+    },
+    {
+        "ErrorRate":  0,
+        "SuccessRate":  100,
+        "AverageResponseTime":  16.56,
+        "FailedRequests":  0,
+        "TotalRequests":  25,
+        "P95ResponseTime":  21.13,
+        "Run":  2,
+        "P99ResponseTime":  22.14,
+        "MaxResponseTime":  22.14,
+        "SuccessfulRequests":  25,
+        "MinResponseTime":  13.03,
+        "Timestamp":  "2025-12-13 22:29:28"
+    }
+]

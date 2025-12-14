@@ -70,8 +70,10 @@ a:hover {
 }
 
 .header-logo .logo img {
-  height: 50px;
-  width: auto;
+  height: 80px;
+  width: 200px;
+  object-fit: contain;
+  max-width: 100%;
 }
 
 /* Navigation */

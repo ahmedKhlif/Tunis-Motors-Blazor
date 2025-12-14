@@ -528,6 +528,29 @@ textarea.input {
   display: block;
 }
 
+.logo img {
+  height: 80px;
+  width: 200px;
+  object-fit: contain;
+  display: block;
+  max-width: 100%;
+}
+
+/* Responsive logo sizing */
+@media (max-width: 768px) {
+  .logo img {
+    height: 60px;
+    width: 150px;
+  }
+}
+
+@media (max-width: 576px) {
+  .logo img {
+    height: 50px;
+    width: 125px;
+  }
+}
+
 /*----------------------------*\
 	Search
 \*----------------------------*/

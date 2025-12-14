@@ -31,15 +31,15 @@
 <!-- SECTION -->
 <div class="section">
     <div class="container">
-<div class="container-fluid py-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0"><i class="fa fa-plus-circle me-2"></i>Add New Car Listing</h4>
-                    <small>Your listing will be reviewed by our team before being published.</small>
-                </div>
-                <div class="card-body">
+        <div class="container-fluid py-4">
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+                    <div class="card shadow">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0"><i class="fa fa-plus-circle me-2"></i>Add New Car Listing</h4>
+                            <small>Your listing will be reviewed by our team before being published.</small>
+                        </div>
+                        <div class="card-body">
                     @if (!string.IsNullOrEmpty(errorMessage))
                     {
                         <div class="alert alert-danger">@errorMessage</div>
@@ -390,12 +390,12 @@
                                 </div>
                             </div>
                         </div>
-                    </EditForm>
+                        </EditForm>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
     </div>
 </div>
 <!-- /SECTION -->
@@ -410,7 +410,7 @@
     private string successMessage = "";
     private string fileError = "";
     private bool isLoading = false;
-    private const int MaxFiles = 5;
+    private const int MaxFiles = 10;
     private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
     
     // Notification dialog
@@ -556,96 +556,129 @@
 
             // Upload images to server
             Console.WriteLine($"[CreateListing] Starting image upload. Files count: {selectedFiles.Count}");
-            foreach (var file in selectedFiles)
+            if (!selectedFiles.Any())
             {
-                Console.WriteLine($"[CreateListing] File: {file.Name}, Size: {file.Size} bytes, Type: {file.ContentType}");
-            }
-            
-            var uploadedPaths = await CarListingService.UploadImagesAsync(selectedFiles);
-            Console.WriteLine($"[CreateListing] Upload result: {(uploadedPaths != null ? uploadedPaths.Count : 0)} images uploaded");
-            
-            if (uploadedPaths == null || !uploadedPaths.Any())
-            {
-                Console.WriteLine("[CreateListing] ERROR: Image upload failed - no paths returned");
-                ShowNotification("Upload Failed", "Failed to upload images. Please check console for details and try again.", NotificationType.Error);
+                fileError = "Please select at least one image file.";
                 isLoading = false;
                 return;
             }
             
-            Console.WriteLine($"[CreateListing] Successfully uploaded {uploadedPaths.Count} images:");
-            foreach (var path in uploadedPaths)
+            foreach (var file in selectedFiles)
             {
-                Console.WriteLine($"[CreateListing]   - {path}");
+                Console.WriteLine($"[CreateListing] File: {file.Name}, Size: {file.Size} bytes, Type: {file.ContentType}");
+                if (file.Size == 0)
+                {
+                    fileError = $"File {file.Name} is empty.";
+                    isLoading = false;
+                    return;
+                }
             }
+            
+            string? uploadError = null;
+            try
+            {
+                Console.WriteLine($"[CreateListing] Calling UploadImagesAsync with {selectedFiles.Count} files");
+                var uploadedPaths = await CarListingService.UploadImagesAsync(selectedFiles);
+                Console.WriteLine($"[CreateListing] Upload result: {(uploadedPaths != null ? uploadedPaths.Count : 0)} images uploaded");
+                
+                if (uploadedPaths == null || !uploadedPaths.Any())
+                {
+                    uploadError = "No images were uploaded. Please check that your images are valid (JPG, PNG, GIF, WEBP) and under 10MB each. Check the browser console for more details.";
+                    Console.WriteLine("[CreateListing] ERROR: Image upload failed - no paths returned");
+                }
+                else
+                {
+                    // Success - continue with listing creation
+                    Console.WriteLine($"[CreateListing] Successfully uploaded {uploadedPaths.Count} images:");
+                    foreach (var path in uploadedPaths)
+                    {
+                        Console.WriteLine($"[CreateListing]   - {path}");
+                    }
+                    
+                    // First image is main image
+                    var mainImage = uploadedPaths.FirstOrDefault() ?? "/images/noimage.jpg";
+                    
+                    // Remaining images as JSON array (skip first image)
+                    string? additionalImagesJson = null;
+                    if (uploadedPaths.Count > 1)
+                    {
+                        var additionalImages = uploadedPaths.Skip(1).ToList();
+                        additionalImagesJson = System.Text.Json.JsonSerializer.Serialize(additionalImages);
+                    }
+                    
+                    var createDto = new CreateCarListingDto
+                    {
+                        Name = model.Name,
+                        Price = model.Price,
+                        Mileage = model.Mileage ?? 0,
+                        Year = model.Year ?? DateTime.Now.Year,
+                        Brand = model.Brand,
+                        FuelType = model.FuelType,
+                        Transmission = model.Transmission,
+                        Color = model.Color,
+                        VIN = model.VIN,
+                        EngineSize = model.EngineSize,
+                        Horsepower = model.Horsepower,
+                        Doors = model.Doors,
+                        Seats = model.Seats,
+                        Description = model.Description,
+                        Features = model.Features,
+                        Condition = model.Condition,
+                        Rating = model.Rating,
+                        Image = mainImage, // First uploaded file
+                        AdditionalImages = additionalImagesJson, // JSON array of remaining files
+                        Location = model.Location,
+                        CategoryId = model.CategoryId,
+                        QuantityInStock = model.QuantityInStock ?? 1,
+                        IsAvailableForRental = model.IsAvailableForRental,
+                        RentalStock = model.RentalStock,
+                        DailyRentalRate = model.DailyRentalRate
+                    };
 
-            // First image is main image
-            var mainImage = uploadedPaths.FirstOrDefault() ?? "/images/noimage.jpg";
-            
-            // Remaining images as JSON array (skip first image)
-            string? additionalImagesJson = null;
-            if (uploadedPaths.Count > 1)
-            {
-                var additionalImages = uploadedPaths.Skip(1).ToList();
-                additionalImagesJson = System.Text.Json.JsonSerializer.Serialize(additionalImages);
-            }
-            
-            var createDto = new CreateCarListingDto
-            {
-                Name = model.Name,
-                Price = model.Price,
-                Mileage = model.Mileage ?? 0,
-                Year = model.Year ?? DateTime.Now.Year,
-                Brand = model.Brand,
-                FuelType = model.FuelType,
-                Transmission = model.Transmission,
-                Color = model.Color,
-                VIN = model.VIN,
-                EngineSize = model.EngineSize,
-                Horsepower = model.Horsepower,
-                Doors = model.Doors,
-                Seats = model.Seats,
-                Description = model.Description,
-                Features = model.Features,
-                Condition = model.Condition,
-                Rating = model.Rating,
-                Image = mainImage, // First uploaded file
-                AdditionalImages = additionalImagesJson, // JSON array of remaining files
-                Location = model.Location,
-                CategoryId = model.CategoryId,
-                QuantityInStock = model.QuantityInStock ?? 1,
-                IsAvailableForRental = model.IsAvailableForRental,
-                RentalStock = model.RentalStock,
-                DailyRentalRate = model.DailyRentalRate
-            };
+                    Console.WriteLine($"[CreateListing] Creating listing with data:");
+                    Console.WriteLine($"[CreateListing]   Name: {createDto.Name}");
+                    Console.WriteLine($"[CreateListing]   Price: {createDto.Price}");
+                    Console.WriteLine($"[CreateListing]   QuantityInStock: {createDto.QuantityInStock}");
+                    Console.WriteLine($"[CreateListing]   IsAvailableForRental: {createDto.IsAvailableForRental}");
+                    Console.WriteLine($"[CreateListing]   RentalStock: {createDto.RentalStock}");
+                    Console.WriteLine($"[CreateListing]   DailyRentalRate: {createDto.DailyRentalRate}");
+                    Console.WriteLine($"[CreateListing]   Image: {createDto.Image}");
+                    Console.WriteLine($"[CreateListing]   AdditionalImages: {createDto.AdditionalImages}");
 
-            Console.WriteLine($"[CreateListing] Creating listing with data:");
-            Console.WriteLine($"[CreateListing]   Name: {createDto.Name}");
-            Console.WriteLine($"[CreateListing]   Price: {createDto.Price}");
-            Console.WriteLine($"[CreateListing]   QuantityInStock: {createDto.QuantityInStock}");
-            Console.WriteLine($"[CreateListing]   IsAvailableForRental: {createDto.IsAvailableForRental}");
-            Console.WriteLine($"[CreateListing]   RentalStock: {createDto.RentalStock}");
-            Console.WriteLine($"[CreateListing]   DailyRentalRate: {createDto.DailyRentalRate}");
-            Console.WriteLine($"[CreateListing]   Image: {createDto.Image}");
-            Console.WriteLine($"[CreateListing]   AdditionalImages: {createDto.AdditionalImages}");
-            
-            var result = await CarListingService.CreateListingAsync(createDto);
-            
-            if (result != null)
-            {
-                Console.WriteLine($"[CreateListing] Listing created successfully! ID: {result.Id}");
-                ShowNotification("Success", "Listing submitted successfully! Redirecting to your listings...", NotificationType.Success);
-                await Task.Delay(2000);
-                NavManager.NavigateTo("/my-listings");
+                    var result = await CarListingService.CreateListingAsync(createDto);
+                    
+                    if (result != null)
+                    {
+                        ShowNotification("Success", "Car listing created successfully!", NotificationType.Success);
+                        NavManager.NavigateTo("/my-listings");
+                    }
+                    else
+                    {
+                        errorMessage = "Failed to create listing. Please try again.";
+                    }
+                    
+                    isLoading = false;
+                    return;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine("[CreateListing] ERROR: Failed to create listing - result is null");
-                ShowNotification("Error", "Failed to create listing. Please try again.", NotificationType.Error);
+                uploadError = $"Upload error: {ex.Message}";
+                Console.WriteLine($"[CreateListing] EXCEPTION during upload: {ex.Message}");
+                Console.WriteLine($"[CreateListing] Stack trace: {ex.StackTrace}");
+            }
+            
+            if (!string.IsNullOrEmpty(uploadError))
+            {
+                ShowNotification("Upload Failed", uploadError, NotificationType.Error);
+                isLoading = false;
+                return;
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Error: {ex.Message}";
+            Console.WriteLine($"[CreateListing] EXCEPTION: {ex.Message}");
         }
         finally
         {

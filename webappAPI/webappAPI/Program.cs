@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -14,6 +15,15 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Configure form options for file uploads (50MB limit, max 10 files)
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50MB
+    options.ValueLengthLimit = 50 * 1024 * 1024; // 50MB per value
+    options.ValueCountLimit = 10; // Max 10 files
+    options.MultipartHeadersLengthLimit = 1024 * 1024; // 1MB for headers
+});
 
 // Add Swagger/OpenAPI with JWT authentication
 builder.Services.AddSwaggerGen(c =>
@@ -178,7 +188,6 @@ builder.Services.AddLogging();
 
 var app = builder.Build();
 
-// Migrate database and seed roles
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -209,6 +218,14 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Enable request buffering for file uploads
+app.Use(async (context, next) =>
+{
+    context.Request.EnableBuffering();
+    await next();
+});
+
 app.UseStaticFiles(); // Enable serving static files from wwwroot
 app.UseCors("AllowBlazorApp");
 app.UseAuthentication();
@@ -217,3 +234,9 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+/// <summary>
+/// Make Program class public for integration tests
+/// </summary>
+public partial class Program { }
+

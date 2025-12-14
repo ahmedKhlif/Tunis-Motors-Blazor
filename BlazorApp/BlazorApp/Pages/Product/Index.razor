@@ -84,15 +84,15 @@
                     <div class="price-filter">
                         <div id="price-slider"></div>
                         <div class="input-number price-min">
-                            <input id="price-min" type="number" @bind="filterModel.MinPrice" placeholder="Min Price">
-                            <span class="qty-up" @onclick="IncreasePriceMin">+</span>
-                            <span class="qty-down" @onclick="DecreasePriceMin">-</span>
+                            <input id="price-min" type="number" @bind="filterModel.MinPrice" @bind:after="ApplyFilters" placeholder="Min Price">
+                            <span class="qty-up" @onclick="async () => { IncreasePriceMin(); await ApplyFilters(); }">+</span>
+                            <span class="qty-down" @onclick="async () => { DecreasePriceMin(); await ApplyFilters(); }">-</span>
                         </div>
                         <span>-</span>
                         <div class="input-number price-max">
-                            <input id="price-max" type="number" @bind="filterModel.MaxPrice" placeholder="Max Price">
-                            <span class="qty-up" @onclick="IncreasePriceMax">+</span>
-                            <span class="qty-down" @onclick="DecreasePriceMax">-</span>
+                            <input id="price-max" type="number" @bind="filterModel.MaxPrice" @bind:after="ApplyFilters" placeholder="Max Price">
+                            <span class="qty-up" @onclick="async () => { IncreasePriceMax(); await ApplyFilters(); }">+</span>
+                            <span class="qty-down" @onclick="async () => { DecreasePriceMax(); await ApplyFilters(); }">-</span>
                         </div>
                     </div>
                 </div>
@@ -104,17 +104,17 @@
                     <div class="mb-2">
                         <label for="year-min" class="form-label small">From Year</label>
                         <div class="input-number year-min">
-                            <input id="year-min" type="number" @bind="filterModel.MinYear" placeholder="e.g. 2010" min="1900" max="2025">
-                            <span class="qty-up" @onclick="IncreaseYearMin">+</span>
-                            <span class="qty-down" @onclick="DecreaseYearMin">-</span>
+                            <input id="year-min" type="number" @bind="filterModel.MinYear" @bind:after="ApplyFilters" placeholder="e.g. 2010" min="1900" max="2025">
+                            <span class="qty-up" @onclick="async () => { IncreaseYearMin(); await ApplyFilters(); }">+</span>
+                            <span class="qty-down" @onclick="async () => { DecreaseYearMin(); await ApplyFilters(); }">-</span>
                         </div>
                     </div>
                     <div>
                         <label for="year-max" class="form-label small">To Year</label>
                         <div class="input-number year-max">
-                            <input id="year-max" type="number" @bind="filterModel.MaxYear" placeholder="e.g. 2024" min="1900" max="2025">
-                            <span class="qty-up" @onclick="IncreaseYearMax">+</span>
-                            <span class="qty-down" @onclick="DecreaseYearMax">-</span>
+                            <input id="year-max" type="number" @bind="filterModel.MaxYear" @bind:after="ApplyFilters" placeholder="e.g. 2024" min="1900" max="2025">
+                            <span class="qty-up" @onclick="async () => { IncreaseYearMax(); await ApplyFilters(); }">+</span>
+                            <span class="qty-down" @onclick="async () => { DecreaseYearMax(); await ApplyFilters(); }">-</span>
                         </div>
                     </div>
                 </div>
@@ -126,9 +126,9 @@
                     <div>
                         <label for="mileage-max" class="form-label small">Max Mileage (km)</label>
                         <div class="input-number mileage-max">
-                            <input id="mileage-max" type="number" @bind="filterModel.MaxMileage" placeholder="e.g. 100000" min="0" max="1000000">
-                            <span class="qty-up" @onclick="IncreaseMileage">+</span>
-                            <span class="qty-down" @onclick="DecreaseMileage">-</span>
+                            <input id="mileage-max" type="number" @bind="filterModel.MaxMileage" @bind:after="ApplyFilters" placeholder="e.g. 100000" min="0" max="1000000">
+                            <span class="qty-up" @onclick="async () => { IncreaseMileage(); await ApplyFilters(); }">+</span>
+                            <span class="qty-down" @onclick="async () => { DecreaseMileage(); await ApplyFilters(); }">-</span>
                         </div>
                     </div>
                 </div>
@@ -137,7 +137,7 @@
                 <!-- aside Widget -->
                 <div class="aside">
                     <h3 class="aside-title">Fuel Type</h3>
-                    <select id="fuel-type" @bind="filterModel.FuelType" class="form-select">
+                    <select id="fuel-type" @bind="filterModel.FuelType" @bind:after="ApplyFilters" class="form-select">
                         <option value="">All Fuel Types</option>
                         @if (fuelTypes != null)
                         {
@@ -153,7 +153,7 @@
                 <!-- aside Widget -->
                 <div class="aside">
                     <h3 class="aside-title">Transmission</h3>
-                    <select id="transmission" @bind="filterModel.Transmission" class="form-select">
+                    <select id="transmission" @bind="filterModel.Transmission" @bind:after="ApplyFilters" class="form-select">
                         <option value="">All Transmissions</option>
                         @if (transmissions != null)
                         {
@@ -248,6 +248,20 @@
 
             <!-- STORE -->
             <div id="store" class="col-md-9">
+                <!-- Search Bar -->
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="input-group">
+                            <input type="text" class="form-control" placeholder="Search by name, brand, or description..." 
+                                   @bind="filterModel.SearchTerm" @bind:after="ApplyFilters" 
+                                   @onkeypress="HandleSearchKeyPress" />
+                            <button class="btn btn-primary" type="button" @onclick="ApplyFilters">
+                                <i class="fa fa-search"></i> Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- store top filter -->
                 <div class="store-filter clearfix">
                     <div class="store-sort">
@@ -516,11 +530,14 @@
 
         try
         {
+            // Reset to first page when filters change
+            filterModel.Page = 1;
+            
             // Apply all selected filters
             filterModel.CategoryId = selectedCategories.Any() ? selectedCategories.First() : null;
             filterModel.Brand = selectedBrands.Any() ? selectedBrands.First() : null;
             
-            Console.WriteLine($"Applying filters - Category: {filterModel.CategoryId}, Brand: {filterModel.Brand}, Fuel: {filterModel.FuelType}, Transmission: {filterModel.Transmission}, Color: {filterModel.Color}, MinPrice: {filterModel.MinPrice}, MaxPrice: {filterModel.MaxPrice}");
+            Console.WriteLine($"Applying filters - Category: {filterModel.CategoryId}, Brand: {filterModel.Brand}, Fuel: {filterModel.FuelType}, Transmission: {filterModel.Transmission}, Color: {filterModel.Color}, MinPrice: {filterModel.MinPrice}, MaxPrice: {filterModel.MaxPrice}, MinYear: {filterModel.MinYear}, MaxYear: {filterModel.MaxYear}, MaxMileage: {filterModel.MaxMileage}, MinRating: {filterModel.MinRating}");
 
             cars = await CarListingService.GetAllListingsAsync(filterModel);
             
@@ -532,6 +549,7 @@
         {
             errorMessage = "Failed to load cars.";
             Console.WriteLine($"Apply filters error: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
         finally
         {
@@ -541,15 +559,26 @@
 
     private async Task ClearFilters()
     {
-        filterModel = new CarListingFilterDto();
+        filterModel = new CarListingFilterDto { PageSize = 12 };
         selectedCategories.Clear();
         selectedBrands.Clear();
         filterModel.MinRating = null;
+        filterModel.Color = null;
+        filterModel.FuelType = null;
+        filterModel.Transmission = null;
+        filterModel.MinPrice = null;
+        filterModel.MaxPrice = null;
+        filterModel.MinYear = null;
+        filterModel.MaxYear = null;
+        filterModel.MaxMileage = null;
+        filterModel.SearchTerm = null;
+        filterModel.SortBy = 0;
+        filterModel.Page = 1;
         Console.WriteLine("Filters cleared, reloading all cars...");
         await ApplyFilters();
     }
 
-    private void ToggleCategory(int categoryId)
+    private async Task ToggleCategory(int categoryId)
     {
         if (selectedCategories.Contains(categoryId))
         {
@@ -560,9 +589,10 @@
             selectedCategories.Clear(); // Single selection for simplicity
             selectedCategories.Add(categoryId);
         }
+        await ApplyFilters();
     }
 
-    private void ToggleBrand(string brand)
+    private async Task ToggleBrand(string brand)
     {
         if (selectedBrands.Contains(brand))
         {
@@ -573,16 +603,27 @@
             selectedBrands.Clear(); // Single selection for simplicity
             selectedBrands.Add(brand);
         }
+        await ApplyFilters();
     }
 
-    private void SetColor(string color)
+    private async Task SetColor(string color)
     {
         filterModel.Color = color;
+        await ApplyFilters();
     }
 
-    private void SetMinRating(int? rating)
+    private async Task SetMinRating(int? rating)
     {
         filterModel.MinRating = rating;
+        await ApplyFilters();
+    }
+
+    private async Task HandleSearchKeyPress(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ApplyFilters();
+        }
     }
 
     private async Task GoToPage(int page)

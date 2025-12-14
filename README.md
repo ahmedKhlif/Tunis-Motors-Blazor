@@ -2,10 +2,13 @@
 
 <div align="center">
 
-![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)
-![Blazor](https://img.shields.io/badge/Blazor-WebAssembly-512BD4?logo=blazor)
-![ASP.NET Core](https://img.shields.io/badge/ASP.NET%20Core-8.0-512BD4)
+![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)
+![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4?logo=blazor)
+![ASP.NET Core](https://img.shields.io/badge/ASP.NET%20Core-9.0-512BD4)
 ![SQL Server](https://img.shields.io/badge/SQL%20Server-LocalDB-CC2927?logo=microsoft-sql-server)
+![Tests](https://img.shields.io/badge/Tests-84%20Passed-success)
+![Coverage](https://img.shields.io/badge/API%20Tests-69%2F69-brightgreen)
+![E2E](https://img.shields.io/badge/E2E%20Tests-15%2F15-brightgreen)
 ![License](https://img.shields.io/badge/License-Academic-blue)
 
 **Plateforme e-commerce moderne pour la vente et location de véhicules en Tunisie**

@@ -189,8 +189,13 @@ namespace webappAPI.Controllers
         [Authorize(Roles = "Seller,Admin")]
         public async Task<ActionResult<ApiResponse<List<string>>>> UploadImages([FromForm] IFormFileCollection files)
         {
+            _logger.LogInformation($"[UploadImages] Received upload request. Files count: {files?.Count ?? 0}");
+            
             if (files == null || files.Count == 0)
+            {
+                _logger.LogWarning("[UploadImages] No files received in request");
                 return BadRequest(new ApiResponse { Success = false, Message = "No files uploaded" });
+            }
 
             // Get or create wwwroot path
             var webRootPath = _hostEnvironment.WebRootPath;
@@ -210,21 +215,26 @@ namespace webappAPI.Controllers
 
             foreach (var file in files)
             {
+                _logger.LogInformation($"[UploadImages] Processing file: {file.FileName}, Size: {file.Length} bytes, ContentType: {file.ContentType}");
+                
                 if (file.Length == 0)
+                {
+                    _logger.LogWarning($"[UploadImages] File {file.FileName} is empty, skipping");
                     continue;
+                }
 
                 // Validate file size
                 if (file.Length > maxFileSize)
                 {
-                    _logger.LogWarning($"File {file.FileName} exceeds max size of 10MB");
+                    _logger.LogWarning($"[UploadImages] File {file.FileName} exceeds max size of 10MB (Size: {file.Length} bytes)");
                     continue;
                 }
 
                 // Validate file extension
                 var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-                if (!allowedExtensions.Contains(ext))
+                if (string.IsNullOrEmpty(ext) || !allowedExtensions.Contains(ext))
                 {
-                    _logger.LogWarning($"File {file.FileName} has invalid extension {ext}");
+                    _logger.LogWarning($"[UploadImages] File {file.FileName} has invalid extension: {ext}");
                     continue;
                 }
 
@@ -233,18 +243,22 @@ namespace webappAPI.Controllers
                     var fileName = Guid.NewGuid().ToString() + ext;
                     var filePath = Path.Combine(uploadsFolder, fileName);
 
+                    _logger.LogInformation($"[UploadImages] Saving file to: {filePath}");
+
                     using (var fileStream = new FileStream(filePath, FileMode.Create))
                     {
                         await file.CopyToAsync(fileStream);
                     }
 
                     // Store relative path for serving from wwwroot
-                    uploadedPaths.Add($"/images/{fileName}");
-                    _logger.LogInformation($"Image uploaded: {fileName}");
+                    var relativePath = $"/images/{fileName}";
+                    uploadedPaths.Add(relativePath);
+                    _logger.LogInformation($"[UploadImages] Successfully uploaded: {fileName} -> {relativePath}");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Error uploading file {file.FileName}: {ex.Message}");
+                    _logger.LogError($"[UploadImages] Error uploading file {file.FileName}: {ex.Message}");
+                    _logger.LogError($"[UploadImages] Stack trace: {ex.StackTrace}");
                     continue;
                 }
             }
